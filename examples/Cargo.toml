@@ -1,0 +1,27 @@
+[package]
+name = "dinvk_example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dinvk = { path = "../" }
+
+[[example]]
+name = "dinvoke"
+path = "dinvoke/main.rs"
+
+[[example]]
+name = "get_module_and_api"
+path = "get_module_and_api/main.rs"
+
+[[example]]
+name = "hash"
+path = "hash/main.rs"
+
+[[example]]
+name = "library_proxy"
+path = "library_proxy/main.rs"
+
+[[example]]
+name = "tampered_syscall"
+path = "tampered_syscall/main.rs"
