@@ -2,7 +2,7 @@
 /// 
 /// # Arguments
 /// 
-/// * `$module` - A string slice representing the name of the module (e.g., `"ntdll.dll"`).
+/// * `$module` - Module address for the api to be called (e.g., `"ntdll.dll"`).
 /// * `$function` - A string slice with the name of the function to invoke (e.g., `"NtQueryInformationProcess"`).
 /// * `$ty` - The type of the function to cast to, including its signature.
 /// * `$($arg-expr),*` - A variadic list of arguments to pass to the function.
@@ -10,7 +10,8 @@
 /// # Example
 /// 
 /// ```rust,ignore
-/// let result = dinvoke!("ntdll.dll", "NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
+/// let ntdll = get_ntdll_address();
+/// let result = dinvoke(ntdll, "NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
 /// ``` 
 #[macro_export]
 macro_rules! dinvoke {
