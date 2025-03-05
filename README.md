@@ -65,12 +65,18 @@ Allows resolving and calling a function dynamically at runtime, avoiding static 
 * Using this macro is beneficial if you want to avoid having APIs directly listed in the `Import Address Table (IAT)` of your PE file.
 
 ```rs
-use dinvk::{data::HeapAlloc, dinvoke, get_peb, GetModuleHandle};
+#![allow(unused)]
+
+use dinvk::{
+    data::HeapAlloc, 
+    dinvoke, 
+    GetModuleHandle
+};
 
 const HEAP_ZERO_MEMORY: u32 = 8u32;
 
 fn main() {
-    let peb = get_peb();
+    let peb = dinvk::NtCurrentPeb();
     let kernel32 = GetModuleHandle("KERNEL32.DLL", None);
     let addr = dinvoke!(
         kernel32,
@@ -80,6 +86,8 @@ fn main() {
         HEAP_ZERO_MEMORY,
         0x200
     );
+    
+    println!("@ Address: {:?}", addr);
 }
 ```
 

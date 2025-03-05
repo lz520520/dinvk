@@ -11,7 +11,7 @@
 /// 
 /// ```rust,ignore
 /// let ntdll = get_ntdll_address();
-/// let result = dinvoke(ntdll, "NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
+/// let result = dinvoke(ntdll,"NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
 /// ``` 
 #[macro_export]
 macro_rules! dinvoke {
@@ -52,7 +52,7 @@ macro_rules! syscall {
         // Retrieve the SSN (System Service Number) for the target function
         ssn($function_name, ntdll).and_then(|ssn| {
             // Calculate the syscall address
-            get_syscall_address(addr).map(|addr| {
+            get_syscall_address(addr).map(|syscall_addr| {
                 // Count the number of arguments provided
                 let cnt = {
                     let mut cnt = 0;
@@ -64,7 +64,7 @@ macro_rules! syscall {
                 };
                 
                 // Perform the syscall using inline assembly (x86_64 / x86 with support WOW64)
-                unsafe { asm::do_syscall(ssn, addr, cnt, $($y), +) }
+                unsafe { asm::do_syscall(ssn, syscall_addr, cnt, $($y), +) }
             })
         })
     }}

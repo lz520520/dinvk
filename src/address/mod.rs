@@ -34,7 +34,7 @@ where
 {
     unsafe {
         let hash = hash.unwrap_or(crc32ba);
-        let peb = get_peb();
+        let peb = NtCurrentPeb();
         let ldr_data = (*peb).Ldr;
         let mut data_table_entry = (*ldr_data).InMemoryOrderModuleList.Flink as *const LDR_DATA_TABLE_ENTRY;
         let mut list_node = (*ldr_data).InMemoryOrderModuleList.Flink;
@@ -84,7 +84,7 @@ where
 /// * A pointer to the base address of the `ntdll.dll` module.
 pub fn get_ntdll_address() -> *mut c_void {
     unsafe {
-        let peb = get_peb();
+        let peb = NtCurrentPeb();
         let ldr_data = ((*(*(*peb).Ldr).InMemoryOrderModuleList.Flink).Flink as *const u8)
             .offset(if cfg!(target_arch = "x86_64") { -0x10 } else { -0x08 }) 
             as *const LDR_DATA_TABLE_ENTRY;
@@ -256,7 +256,7 @@ unsafe fn get_forwarded_address(
 /// 
 /// * Pointer to the PEB structure.
 #[inline(always)]
-pub fn get_peb() -> *const PEB {
+pub fn NtCurrentPeb() -> *const PEB {
     unsafe {
         #[cfg(target_arch = "x86_64")]
         return __readgsqword(0x60) as *const PEB;

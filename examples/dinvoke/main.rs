@@ -1,11 +1,15 @@
 #![allow(unused)]
 
-use dinvk::{data::HeapAlloc, dinvoke, get_peb, GetModuleHandle};
+use dinvk::{
+    data::HeapAlloc, 
+    dinvoke, 
+    GetModuleHandle
+};
 
 const HEAP_ZERO_MEMORY: u32 = 8u32;
 
 fn main() {
-    let peb = get_peb();
+    let peb = dinvk::NtCurrentPeb();
     let kernel32 = GetModuleHandle("KERNEL32.DLL", None);
     let addr = dinvoke!(
         kernel32,
