@@ -63,11 +63,11 @@ macro_rules! syscall {
                     cnt
                 };
                 
-                // Perform the syscall using inline assembly (x86_64 / x86 with support WOW64)
+                // Perform the syscall using inline assembly (x86_64 / x86 and with support WOW64)
                 unsafe { asm::do_syscall(ssn, syscall_addr, cnt, $($y), +) }
             })
         })
-    }}
+    }};
 }
 
 /// Declares an external function from a dynamically linked library.

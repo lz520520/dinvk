@@ -39,7 +39,7 @@ skip:
     jmp rcx
 ");
 
-// Implementation in asm to perform indirect syscall (`x32`)
+// Implementation in asm to perform indirect syscall (`x86`)
 #[cfg(target_arch = "x86")]
 core::arch::global_asm!("
 .global _do_syscall

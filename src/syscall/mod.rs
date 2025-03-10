@@ -1,16 +1,21 @@
+use alloc::string::ToString;
 use core::{
     ffi::{c_void, CStr}, 
     ptr::read, 
-    slice::from_raw_parts
+    slice::from_raw_parts,
+    sync::atomic::{Ordering, AtomicUsize},
 };
 use crate::{ 
-    hash::jenkins, 
-    parse::get_export_directory
+    hash::jenkins3, 
+    parse::get_export_directory,
+    LoadLibraryA, GetModuleHandle, 
+    GetProcAddress
 };
 
 /// Assembly-level utilities and inline assembly code used in the crate.
 ///
 /// # Note
+/// 
 /// - This module is hidden from the public API documentation (`#[doc(hidden)]`).
 /// - It is intended for internal use only.
 #[doc(hidden)]
@@ -24,6 +29,128 @@ const DOWN: usize = 32;
 
 /// The step size used to scan memory in an upward direction.
 const UP: isize = -32;
+
+/// The global variable that stores the currently selected DLL for system calls.
+///
+/// # Default
+///
+/// By default, this is set to `Dll::Ntdll`, meaning that system calls will be
+/// resolved from `ntdll.dll` unless explicitly changed using [`Dll::use_dll`].
+static DEFAULT_DLL: AtomicUsize = AtomicUsize::new(Dll::Ntdll as usize);
+
+/// Represents different dynamic link libraries (DLLs) that contain system call functions.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Dll {
+    #[cfg(target_arch = "x86_64")]
+    /// `iumdll.dll`
+    Iumdll,
+
+    #[cfg(target_arch = "x86_64")]
+    /// `vertdll.dll`
+    Vertdll,
+
+    /// `win32u.dll`
+    Win32u,
+
+    /// `ntdll.dll`
+    Ntdll,
+}
+
+impl Dll {
+    /// Sets the default DLL to be used for system calls.
+    ///
+    /// # Arguments
+    ///
+    /// * `dll` - The [`Dll`] variant to use as the new default.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use dinvk::Dll;
+    ///
+    /// // Switch to win32u.dll for GUI-related syscalls
+    /// Dll::use_dll(Dll::Win32u);
+    /// ```
+    pub fn use_dll(dll: Dll) {
+        DEFAULT_DLL.store(dll as usize, Ordering::Relaxed);
+    }
+
+    /// Retrieves the currently selected DLL for system calls.
+    ///
+    /// # Returns
+    ///
+    /// * The currently set DLL as a [`Dll`] enum variant.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use dinvk::Dll;
+    ///
+    /// // Retrieve the currently selected DLL
+    /// let dll = Dll::current();
+    ///
+    /// println!("Current DLL: {}", dll);
+    /// ```
+    pub fn current() -> Dll {
+        match DEFAULT_DLL.load(Ordering::Relaxed) {
+            #[cfg(target_arch = "x86_64")]
+            x if x == Dll::Iumdll as usize => Dll::Iumdll,
+            #[cfg(target_arch = "x86_64")]
+            x if x == Dll::Vertdll as usize => Dll::Vertdll,
+            x if x == Dll::Win32u as usize => Dll::Win32u,
+            _ => Dll::Ntdll,
+        }
+    }
+
+    /// Returns the function name associated with the selected DLL, if applicable.
+    ///
+    /// # Returns
+    ///
+    /// * A static string slice (`&str`) containing the function name or an empty string.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use dinvk::Dll;
+    ///
+    /// let dll = Dll::Win32u;
+    /// println!("Function: {}", dll.function_hash());
+    /// ```
+    fn function_hash(&self) -> u32 {
+        match self {
+            Dll::Ntdll => 0,
+            Dll::Win32u => 2604093150u32,
+            #[cfg(target_arch = "x86_64")]
+            Dll::Iumdll => 75139374u32,
+            #[cfg(target_arch = "x86_64")]
+            Dll::Vertdll => 2237456582u32,
+        }
+    }
+}
+
+impl core::fmt::Display for Dll {
+    /// Formats the `Dll` variant as its corresponding DLL file name.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use dinvk::Dll;
+    ///
+    /// let dll = Dll::Win32u;
+    /// println!("DLL: {}", dll);
+    /// ```
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let name: &[u8] = match self {
+            Dll::Ntdll => &[0x4E, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
+            Dll::Win32u => &[0x57, 0x49, 0x4E, 0x13, 0x12, 0x55, 0x0E, 0x44, 0x4C, 0x4C],
+            #[cfg(target_arch = "x86_64")]
+            Dll::Iumdll => &[0x49, 0x55, 0x4D, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
+            #[cfg(target_arch = "x86_64")]
+            Dll::Vertdll => &[0x56, 0x45, 0x52, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
+        };
+        write!(f, "{}", name.iter().map(|&c| (c ^ 0x20) as char).collect::<alloc::string::String>())
+    }
+}
 
 /// Resolves the System Service Number (SSN) for a given function name within a module.
 ///
@@ -44,7 +171,7 @@ pub fn ssn(
     unsafe {
         // Recovering the export directory and hashing the module 
         let export_dir = get_export_directory(module)?;
-        let hash = jenkins(function_name);
+        let hash = jenkins3(function_name);
         let module = module as usize;
         
         // Retrieving information from module names
@@ -72,8 +199,8 @@ pub fn ssn(
                 .to_str()
                 .unwrap_or("");
     
-            // Comparation by Hash (Default `Jenkins One-at-a-Time`)
-            if jenkins(&name) == hash {
+            // Comparation by Hash (Default `jenkins3`)
+            if jenkins3(&name) == hash {
                 // Hells Gate
                 // MOV R10, RCX
                 // MOV RCX, <ssn>
@@ -181,7 +308,7 @@ pub fn ssn(
     unsafe {
         // Recovering the export directory and hashing the module 
         let export_dir = get_export_directory(module)?;
-        let hash = jenkins(function_name);
+        let hash = jenkins3(function_name);
         let module = module as usize;
 
         // Retrieving information from module names
@@ -209,8 +336,8 @@ pub fn ssn(
                 .to_str()
                 .unwrap_or("");
 
-            // Comparation by Hash (Default `Jenkins One-at-a-Time`)
-            if jenkins(&name) == hash {
+            // Comparation by Hash (Default `Jenkins3`)
+            if jenkins3(&name) == hash {
                 // Hells Gate (x86)
                 // MOV EAX, <ssn>  => 0xB8 XX XX 00 00
                 if read(address) == 0xB8
@@ -233,7 +360,7 @@ pub fn ssn(
                             {
                                 let high = read(address.add(2 + idx * DOWN)) as u16;
                                 let low = read(address.add(1 + idx * DOWN)) as u16;
-                                let ssn = (high << 8) | (low - (idx * 2)  as u16);
+                                let ssn = (high << 8) | (low - (idx * 2) as u16);
                                 return Some(ssn);
                             }
     
@@ -294,20 +421,32 @@ pub fn ssn(
 /// * `Some(u64)` - The address of the `syscall` instruction if found.
 /// * `None` - If the `syscall` instruction cannot be located.
 #[cfg(target_arch = "x86_64")]
-pub fn get_syscall_address(address: *mut c_void) -> Option<u64> {
+pub fn get_syscall_address(mut address: *mut c_void) -> Option<u64> {
     unsafe {
+        // Here we will use `win32u.dll` / `vertdll.dll` / `iumdll.dll`, 
+        // in case ntdll is not chosen to invoke the syscall
+        let dll = Dll::current();
+        if dll != Dll::Ntdll {
+            let mut h_module = GetModuleHandle(dll.to_string(), None);
+            if h_module.is_null() {
+                h_module = LoadLibraryA(&dll.to_string());
+            }
+
+            address = GetProcAddress(h_module, dll.function_hash(), Some(jenkins3));
+        }
+
         let address = address.cast::<u8>();
-        for i in 1..255 {
+        (1..255).find_map(|i| {
             if read(address.add(i)) == 0x0F
                 && read(address.add(i + 1)) == 0x05
-                && read(address.add(i + 2)) == 0xC3 
+                && read(address.add(i + 2)) == 0xC3
             {
-                return Some(address.add(i) as u64)
+                Some(address.add(i) as u64)
+            } else {
+                None
             }
-        }
+        })
     }
-
-    None
 }
 
 /// Retrieves the syscall address from a given function address.
@@ -323,32 +462,45 @@ pub fn get_syscall_address(address: *mut c_void) -> Option<u64> {
 #[cfg(target_arch = "x86")]
 pub fn get_syscall_address(address: *mut c_void) -> Option<u32> {
     unsafe {
-        let address = address.cast::<u8>();
-        // Is Process wow64?
+        // Is Process wow64? (Here we will always use `ntdll.dll` to invoke)
+        let mut address = address.cast::<u8>();
         if is_wow64() {
-            for i in 1..255 { 
+            return (1..255).find_map(|i| {
                 if read(address.add(i)) == 0xFF 
                     && read(address.add(i + 1)) == 0xD2 
                 {
-                    return Some(address.add(i) as u32); 
+                    Some(address.add(i) as u32)
+                } else {
+                    None
                 }
-            }        
+            });
+        }
+
+        // Here we will use `win32u.dll`, in case ntdll is not chosen to invoke the syscall
+        let dll = Dll::current();
+        if dll != Dll::Ntdll {
+            let mut h_module = GetModuleHandle(dll.to_string(), None);
+            if h_module.is_null() {
+                h_module = LoadLibraryA(&dll.to_string());
+            }
+
+            address = GetProcAddress(h_module, dll.function_hash(), Some(jenkins3)).cast::<u8>();
         }
 
         // If it's not a wow64 process, it's a native x86 process
-        for i in 1..255 {
+        (1..255).find_map(|i| {
             if read(address.add(i)) == 0x8B
                 && read(address.add(i + 1)) == 0xD4
                 && read(address.add(i + 2)) == 0x0F
                 && read(address.add(i + 3)) == 0x34
                 && read(address.add(i + 4)) == 0xC3
             {
-                return Some(address.add(i + 2) as u32);
+                Some(address.add(i + 2) as u32)
+            } else {
+                None
             }
-        }
+        })
     }
-
-    None
 }
 
 /// Checks if the process is running under WOW64 (Windows 32-bit on a 64-bit OS).
@@ -378,7 +530,7 @@ pub fn get_syscall_address(address: *mut c_void) -> Option<u32> {
 /// - https://github.com/AlexPetrusca/assembly-virus/blob/17dbe88e066c4ae680136d10cd3110820169a0e9/docs/TEB.txt#L23
 #[cfg(target_arch = "x86")]
 #[inline(always)]
-pub fn is_wow64() -> bool {
+pub(crate) fn is_wow64() -> bool {
     let addr = unsafe { crate::__readfsdword(0xC0) };
     addr != 0
 }
