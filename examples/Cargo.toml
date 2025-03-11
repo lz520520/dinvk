@@ -25,3 +25,7 @@ path = "library_proxy/main.rs"
 [[example]]
 name = "tampered_syscall"
 path = "tampered_syscall/main.rs"
+
+[[example]]
+name = "syscall"
+path = "syscall/main.rs"
