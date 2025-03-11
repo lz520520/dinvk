@@ -20,7 +20,7 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
     - [Dynamically Invoke Arbitrary Code](#dynamically-invoke-arbitrary-code)
     - [Retrieving Module Addresses and Exported APIs](#retrieving-module-addresses-and-exported-apis)
     - [Indirect syscall](#indirect-syscall)
-    - [Changing the origins of syscall invocation](#changing-the-origins-of-syscall-invocation)
+    - [Redirecting Syscall Invocation to Different DLLs](#redirecting-syscall-invocation-to-different-dlls)
     - [Different Hash Methods for API Hashing](#different-hash-methods-for-api-hashing)
     - [Library Proxy Loading](#library-proxy-loading)
     - [Tampered Syscalls Via Hardware BreakPoints](#tampered-syscalls-via-hardware-breakpoints)
@@ -33,6 +33,7 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
 
 - ✅ Dynamically invoke arbitrary code
 - ✅ Indirect Syscall (*x64*, *x86*, *Wow64*)
+- ✅ Redirecting Syscall Invocation to Different DLLs
 - ✅ Tampered Syscalls Via Hardware BreakPoints (*x64*, *x86*, *Wow64*)
 - ✅ PE headers parsing
 - ✅ Library Proxy Loading
