@@ -20,6 +20,7 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
     - [Dynamically Invoke Arbitrary Code](#dynamically-invoke-arbitrary-code)
     - [Retrieving Module Addresses and Exported APIs](#retrieving-module-addresses-and-exported-apis)
     - [Indirect syscall](#indirect-syscall)
+    - [Changing the origins of syscall invocation](#changing-the-origins-of-syscall-invocation)
     - [Different Hash Methods for API Hashing](#different-hash-methods-for-api-hashing)
     - [Library Proxy Loading](#library-proxy-loading)
     - [Tampered Syscalls Via Hardware BreakPoints](#tampered-syscalls-via-hardware-breakpoints)
@@ -150,6 +151,38 @@ fn main() -> Result<(), NTSTATUS> {
     Ok(())
 }
 ```
+
+## Changing the origins of syscall invocation
+
+By default, syscalls in Windows are invoked via `ntdll.dll`. However, on x86_64 architectures, other DLLs such as `win32u.dll`, `vertdll.dll` and `iumdll.dll` also contain syscall instructions, allowing you to avoid indirect calls via `ntdll.dll`. On x86, only `win32u.dll` has these instructions.
+
+The code below demonstrates how to invoke `NtAllocateVirtualMemory` using different DLLs to execute the syscall:
+
+```rs
+use std::{ffi::c_void, ptr::null_mut};
+use dinvk::{
+    data::{HANDLE, NTSTATUS, NT_SUCCESS}, 
+    syscall, Dll
+};
+
+fn main() -> Result<(), NTSTATUS> {
+    // Alternatively, you can use Dll::Vertdll or Dll::Iumdll on x86_64
+    Dll::use_dll(Dll::Win32u);
+
+    // Memory allocation using a syscall
+    let mut addr = null_mut::<c_void>();
+    let mut size = (1 << 12) as usize;
+    let status = syscall!("NtAllocateVirtualMemory", -1isize as HANDLE, &mut addr, 0, &mut size, 0x3000, 0x04).ok_or(-1)?;
+    if !NT_SUCCESS(status) {
+        eprintln!("@ NtAllocateVirtualMemory Failed With Status: {}", status);
+        return Err(status);
+    }
+
+    Ok(())
+}
+```
+
+This method can be useful to avoid indirect invocations in `ntdll.dll`, diversifying the points of origin of the syscalls in the process.
 
 ### Different Hash Methods for API Hashing
 
