@@ -153,7 +153,7 @@ fn main() -> Result<(), NTSTATUS> {
 }
 ```
 
-## Changing the origins of syscall invocation
+## Redirecting Syscall Invocation to Different DLLs
 
 By default, syscalls in Windows are invoked via `ntdll.dll`. However, on x86_64 architectures, other DLLs such as `win32u.dll`, `vertdll.dll` and `iumdll.dll` also contain syscall instructions, allowing you to avoid indirect calls via `ntdll.dll`. On x86, only `win32u.dll` has these instructions.
 
