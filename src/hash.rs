@@ -215,7 +215,7 @@ pub fn fnv1a(string: &str) -> u32 {
 /// println!("MurmurHash3 hash: {}", hash);
 /// ```
 pub fn murmur3(string: &str) -> u32 {
-    const SEED: u32 = obfstr::random!(u32);
+    const SEED: u32 = 0x9747B28C;
     const C1: u32 = 0xCC9E_2D51;
     const C2: u32 = 0x1B87_3593;
     
@@ -352,7 +352,7 @@ pub fn pjw(string: &str) -> u32 {
     hash
 }
 
-/// Computes the JavaScript (JS) hash function.
+/// JS Hash is a hashing algorithm created by Justin Sobel.
 ///
 /// # Arguments
 ///
