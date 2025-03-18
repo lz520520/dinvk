@@ -7,7 +7,7 @@
 ![Stars](https://img.shields.io/github/stars/joaoviictorti/dinvk)
 ![License](https://img.shields.io/github/license/joaoviictorti/dinvk)
 
-Dynamically invoke arbitrary code with Rust tricks, `#[no_std]` support, and compatibility for `x64`, `x86`, and `WoW64` (DInvoke)
+Dynamically invoke arbitrary code with Rust tricks, `#[no_std]` support, and compatibility for `x64`, `x86`, `ARM64` `WoW64` (DInvoke)
 
 This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), originally written in C#, with additional features added.
 
