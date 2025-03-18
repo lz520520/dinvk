@@ -56,7 +56,7 @@ impl<'a> LdrProxy<'a> {
             core::mem::transmute(load_library),
             module_name.as_ptr() as *mut c_void,
             0x00000000
-        ))
+        )?)
     }
 
     /// Schedules a timer to execute the loading of the specified module.
@@ -75,7 +75,7 @@ impl<'a> LdrProxy<'a> {
         
         // Create a timer queue
         let mut queue = null_mut();
-        let status = dinvoke!(ntdll, s!("RtlCreateTimerQueue"), RtlCreateTimerQueue, &mut queue);
+        let status = dinvoke!(ntdll, s!("RtlCreateTimerQueue"), RtlCreateTimerQueue, &mut queue)?;
         if !NT_SUCCESS(status) {
             return None;
         }
@@ -94,7 +94,7 @@ impl<'a> LdrProxy<'a> {
             0,
             0,
             WT_EXECUTEINTIMERTHREAD
-        ))
+        )?)
     }
 
     /// Registers a wait event to execute the loading of the specified module.
@@ -111,7 +111,7 @@ impl<'a> LdrProxy<'a> {
     
         // Create an event handle
         let mut h_event = null_mut();
-        let status = dinvoke!(ntdll, s!("NtCreateEvent"), NtCreateEvent, &mut h_event, EVENT_ALL_ACCESS, null_mut(), EVENT_TYPE::SynchronizationEvent, 0);
+        let status = dinvoke!(ntdll, s!("NtCreateEvent"), NtCreateEvent, &mut h_event, EVENT_ALL_ACCESS, null_mut(), EVENT_TYPE::SynchronizationEvent, 0)?;
         if !NT_SUCCESS(status) {
             return None;
         }
@@ -129,7 +129,7 @@ impl<'a> LdrProxy<'a> {
             module_name.as_ptr() as *mut c_void,
             0,
             WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD
-        ))
+        )?)
     }
 }
 

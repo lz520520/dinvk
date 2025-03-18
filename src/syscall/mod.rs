@@ -1,16 +1,18 @@
-use alloc::string::ToString;
 use core::{
     ffi::{c_void, CStr}, 
     ptr::read, 
     slice::from_raw_parts,
-    sync::atomic::{Ordering, AtomicUsize},
 };
 use crate::{ 
     hash::jenkins3, 
     parse::get_export_directory,
-    LoadLibraryA, GetModuleHandle, 
-    GetProcAddress
 };
+
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::{LoadLibraryA, GetModuleHandle, GetProcAddress};
+
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use alloc::string::ToString;
 
 /// Assembly-level utilities and inline assembly code used in the crate.
 ///
@@ -21,136 +23,21 @@ use crate::{
 #[doc(hidden)]
 pub mod asm;
 
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+pub use dll::*;
+mod dll;
+
 /// The maximum range of bytes to search when resolving syscall instructions.
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 const RANGE: usize = 255;
 
 /// The step size used to scan memory in a downward direction.
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 const DOWN: usize = 32;
 
 /// The step size used to scan memory in an upward direction.
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 const UP: isize = -32;
-
-/// The global variable that stores the currently selected DLL for system calls.
-///
-/// # Default
-///
-/// By default, this is set to `Dll::Ntdll`, meaning that system calls will be
-/// resolved from `ntdll.dll` unless explicitly changed using [`Dll::use_dll`].
-static DEFAULT_DLL: AtomicUsize = AtomicUsize::new(Dll::Ntdll as usize);
-
-/// Represents different dynamic link libraries (DLLs) that contain system call functions.
-#[derive(Clone, Copy, PartialEq)]
-pub enum Dll {
-    #[cfg(target_arch = "x86_64")]
-    /// `iumdll.dll`
-    Iumdll,
-
-    #[cfg(target_arch = "x86_64")]
-    /// `vertdll.dll`
-    Vertdll,
-
-    /// `win32u.dll`
-    Win32u,
-
-    /// `ntdll.dll`
-    Ntdll,
-}
-
-impl Dll {
-    /// Sets the default DLL to be used for system calls.
-    ///
-    /// # Arguments
-    ///
-    /// * `dll` - The [`Dll`] variant to use as the new default.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// // Switch to win32u.dll for GUI-related syscalls
-    /// Dll::use_dll(Dll::Win32u);
-    /// ```
-    pub fn use_dll(dll: Dll) {
-        DEFAULT_DLL.store(dll as usize, Ordering::Relaxed);
-    }
-
-    /// Retrieves the currently selected DLL for system calls.
-    ///
-    /// # Returns
-    ///
-    /// * The currently set DLL as a [`Dll`] enum variant.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// // Retrieve the currently selected DLL
-    /// let dll = Dll::current();
-    ///
-    /// println!("Current DLL: {}", dll);
-    /// ```
-    pub fn current() -> Dll {
-        match DEFAULT_DLL.load(Ordering::Relaxed) {
-            #[cfg(target_arch = "x86_64")]
-            x if x == Dll::Iumdll as usize => Dll::Iumdll,
-            #[cfg(target_arch = "x86_64")]
-            x if x == Dll::Vertdll as usize => Dll::Vertdll,
-            x if x == Dll::Win32u as usize => Dll::Win32u,
-            _ => Dll::Ntdll,
-        }
-    }
-
-    /// Returns the function name associated with the selected DLL, if applicable.
-    ///
-    /// # Returns
-    ///
-    /// * A static string slice (`&str`) containing the function name or an empty string.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// let dll = Dll::Win32u;
-    /// println!("Function: {}", dll.function_hash());
-    /// ```
-    fn function_hash(&self) -> u32 {
-        match self {
-            Dll::Ntdll => 0,
-            Dll::Win32u => 2604093150u32,
-            #[cfg(target_arch = "x86_64")]
-            Dll::Iumdll => 75139374u32,
-            #[cfg(target_arch = "x86_64")]
-            Dll::Vertdll => 2237456582u32,
-        }
-    }
-}
-
-impl core::fmt::Display for Dll {
-    /// Formats the `Dll` variant as its corresponding DLL file name.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// let dll = Dll::Win32u;
-    /// println!("DLL: {}", dll);
-    /// ```
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let name: &[u8] = match self {
-            Dll::Ntdll => &[0x4E, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-            Dll::Win32u => &[0x57, 0x49, 0x4E, 0x13, 0x12, 0x55, 0x0E, 0x44, 0x4C, 0x4C],
-            #[cfg(target_arch = "x86_64")]
-            Dll::Iumdll => &[0x49, 0x55, 0x4D, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-            #[cfg(target_arch = "x86_64")]
-            Dll::Vertdll => &[0x56, 0x45, 0x52, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-        };
-        write!(f, "{}", name.iter().map(|&c| (c ^ 0x20) as char).collect::<alloc::string::String>())
-    }
-}
 
 /// Resolves the System Service Number (SSN) for a given function name within a module.
 ///
@@ -281,6 +168,75 @@ pub fn ssn(
                                 return Some(ssn);
                             }
                     }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Resolves the System Service Number (SSN) for a given function name within a module.
+///
+/// # Arguments
+///
+/// * `function_name` - The name of the function to resolve.
+/// * `module` - A pointer to the base address of the module containing the function.
+///
+/// # Returns
+/// 
+/// * `Some(u16)` - The System Service Number (SSN) if resolved successfully.
+/// * `None` - If the function or its SSN could not be resolved.
+#[cfg(target_arch = "aarch64")]
+pub fn ssn(
+    function_name: &str,
+    module: *mut c_void,
+) -> Option<u16> {
+    unsafe {
+        // Recovering the export directory and hashing the module 
+        let export_dir = get_export_directory(module)?;
+        let hash = jenkins3(function_name);
+        let module = module as usize;
+        
+        // Retrieving information from module names
+        let names = from_raw_parts((
+            module + (*export_dir).AddressOfNames as usize) as *const u32, 
+            (*export_dir).NumberOfNames as usize
+        );
+
+        // Retrieving information from functions
+        let functions = from_raw_parts(
+            (module + (*export_dir).AddressOfFunctions as usize) as *const u32, 
+            (*export_dir).NumberOfFunctions as usize
+        );
+
+        // Retrieving information from ordinals
+        let ordinals = from_raw_parts(
+            (module + (*export_dir).AddressOfNameOrdinals as usize) as *const u16, 
+            (*export_dir).NumberOfNames as usize
+        );
+        
+        for i in 0..(*export_dir).NumberOfNames as isize {
+            let ordinal = ordinals[i as usize] as usize;
+            let address = (module + functions[ordinal] as usize) as *const u8;
+            let name = CStr::from_ptr((module + names[i as usize] as usize) as *const i8)
+                .to_str()
+                .unwrap_or("");
+    
+            // Comparation by Hash (Default `jenkins3`)
+            if jenkins3(&name) == hash {
+                // svc, #`<ssn>`
+                if read(address.add(3)) == 0xD4
+                    && (read(address.add(2)) & 0xFC) == 0x00
+                {
+                    let opcode = (read(address.add(3)) as u32) << 24
+                        | (read(address.add(2)) as u32) << 16
+                        | (read(address.add(1)) as u32) << 8
+                        | (read(address) as u32);
+            
+                    // Take the bits [5:20]
+                    let ssn = (opcode >> 5) & 0xFFFF;
+                    return Some(ssn as u16);
                 }
             }
         }

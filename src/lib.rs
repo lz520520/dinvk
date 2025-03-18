@@ -15,6 +15,8 @@ mod str;
 pub mod data;
 pub mod hash;
 pub mod parse;
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod breakpoint;
 
 #[cfg(feature = "dinvk_panic")]

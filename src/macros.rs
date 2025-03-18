@@ -11,17 +11,21 @@
 /// 
 /// ```rust,ignore
 /// let ntdll = get_ntdll_address();
-/// let result = dinvoke(ntdll,"NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
+/// let result = dinvoke!(ntdll,"NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
 /// ``` 
 #[macro_export]
 macro_rules! dinvoke {
     ($module:expr, $function:expr, $ty:ty, $($arg:expr),*) => {{
         // Get the address of the function in the specified module.
         let address = $crate::GetProcAddress($module, $function, None);
-        unsafe {
-            // Transmute the function pointer to the desired type and invoke it with the provided arguments.
-            let func = core::mem::transmute::<_, $ty>(address);
-            func($($arg),*)
+        if address.is_null() {
+            None
+        } else {
+            unsafe {
+                // Transmute the function pointer to the desired type and invoke it with the provided arguments.
+                let func = core::mem::transmute::<_, $ty>(address);
+                Some(func($($arg),*))
+            }
         }
     }};
 }
@@ -39,6 +43,7 @@ macro_rules! dinvoke {
 /// syscall!("NtQueryInformationProcess", process_handle, process_info_class, process_info, process_info_length, return_length);
 /// ```
 #[macro_export]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 macro_rules! syscall {
     ($function_name:expr, $($y:expr), +) => {{
         use $crate::*;

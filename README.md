@@ -31,7 +31,7 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
 
 ## Features
 
-- ✅ Dynamically invoke arbitrary code
+- ✅ Dynamically invoke arbitrary code (*x64*, *x86*, *Wow64*, *ARM64*)
 - ✅ Indirect Syscall (*x64*, *x86*, *Wow64*)
 - ✅ Redirecting Syscall Invocation to Different DLLs
 - ✅ Tampered Syscalls Via Hardware BreakPoints (*x64*, *x86*, *Wow64*)
@@ -119,9 +119,8 @@ fn main() {
 
 Executes syscalls indirectly, bypassing user-mode API hooks and security monitoring tools.
 
-* This macro has no argument limit and is designed only for x64 architecture.
-* It uses techniques such as Hells Gate, Halos Gate, and Tartarus Gate to dynamically locate the System Service Number (SSN) and invoke the syscall indirectly.
 * Currently supporting x64, x86 and WoW64.
+* It uses techniques such as Hells Gate, Halos Gate, and Tartarus Gate to dynamically locate the System Service Number (SSN) and invoke the syscall indirectly.
 
 ```rs
 use std::{ffi::c_void, ptr::null_mut};

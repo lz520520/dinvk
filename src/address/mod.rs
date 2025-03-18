@@ -86,7 +86,7 @@ pub fn get_ntdll_address() -> *mut c_void {
     unsafe {
         let peb = NtCurrentPeb();
         let ldr_data = ((*(*(*peb).Ldr).InMemoryOrderModuleList.Flink).Flink as *const u8)
-            .offset(if cfg!(target_arch = "x86_64") { -0x10 } else { -0x08 }) 
+            .offset(if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) { -0x10 } else { -0x08 }) 
             as *const LDR_DATA_TABLE_ENTRY;
         
         (*ldr_data).DllBase.cast::<c_void>()
@@ -263,6 +263,9 @@ pub fn NtCurrentPeb() -> *const PEB {
 
         #[cfg(target_arch = "x86")]
         return __readfsdword(0x30) as *const PEB;
+
+        #[cfg(target_arch = "aarch64")]
+        return *(__readx18(0x60) as *const *const PEB);
     }
 }
 
@@ -308,4 +311,25 @@ pub(crate) unsafe fn __readfsdword(offset: u32) -> u32 {
         options(nostack, pure, readonly),
     );
     out
+}
+
+/// Reads a `u64` value from the x18 register at the specified offset.
+///
+/// # Arguments
+///
+/// * `offset` - The offset added to the value stored in x18.
+///
+/// # Returns
+///
+/// * The value read from x18 plus the given offset.
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+pub (crate) unsafe fn __readx18(offset: u64) -> u64 {
+    let out: u64;
+    core::arch::asm!(
+        "mov {}, x18",
+        lateout(reg) out,
+        options(nostack, pure, readonly),
+    );
+    out + offset
 }

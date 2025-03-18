@@ -1,17 +1,16 @@
-use alloc::boxed::Box;
+use crate::data::*;
 use obfstr::obfstr as s;
 use core::ffi::c_void;
 use crate::{
-    GetModuleHandle, GetProcAddress, dinvoke,
-    get_ntdll_address, get_syscall_address,
+    GetModuleHandle, 
+    dinvoke, get_ntdll_address,
 };
-use crate::{
-    data::*,
-    breakpoint::{
-        is_breakpoint_enabled, 
-        set_breakpoint, 
-        WINAPI, CURRENT_API
-    },
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use crate::breakpoint::{
+    is_breakpoint_enabled, 
+    set_breakpoint, 
+    WINAPI, CURRENT_API
 };
 
 /// Wrapper for the `LoadLibraryA` function from `KERNEL32.DLL`.
@@ -24,9 +23,11 @@ pub fn LoadLibraryA(module: &str) -> *mut c_void {
         LoadLibraryA,
         name.as_ptr()
     )
+    .unwrap_or(core::ptr::null_mut())
 }
 
 /// Wrapper for the `NtAllocateVirtualMemory` function from `NTDLL.DLL`.
+#[allow(unused_mut)]
 pub fn NtAllocateVirtualMemory(
     mut process_handle: HANDLE,
     base_address: *mut *mut c_void,
@@ -38,26 +39,30 @@ pub fn NtAllocateVirtualMemory(
     // Retrieve the address of the ntdll.dll module in memory.
     let ntdll = get_ntdll_address();
 
-    // Handle debugging breakpoints, if enabled.
-    if is_breakpoint_enabled() {
-        unsafe {
-            CURRENT_API = Some(WINAPI::NtAllocateVirtualMemory {
-                ProcessHandle: process_handle,
-                Protect: protect,
-            });
-        }
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            // Handle debugging breakpoints, if enabled.
+            if is_breakpoint_enabled() {
+                unsafe {
+                    CURRENT_API = Some(WINAPI::NtAllocateVirtualMemory {
+                        ProcessHandle: process_handle,
+                        Protect: protect,
+                    });
+                }
+                
+                // Argument tampering before syscall execution.
+                // Modifies the memory protection to PAGE_READONLY.
+                protect = 0x02;
         
-        // Argument tampering before syscall execution.
-        // Modifies the memory protection to PAGE_READONLY.
-        protect = 0x02;
-
-        // Replaces the process handle with an arbitrary value.
-        process_handle = -23isize as HANDLE; 
-        
-        // Locate and set a breakpoint on the NtAllocateVirtualMemory syscall.
-        let addr = GetProcAddress(ntdll, s!("NtAllocateVirtualMemory"), None);
-        if let Some(syscall_addr) = get_syscall_address(addr) {
-            set_breakpoint(syscall_addr);
+                // Replaces the process handle with an arbitrary value.
+                process_handle = -23isize as HANDLE; 
+                
+                // Locate and set a breakpoint on the NtAllocateVirtualMemory syscall.
+                let addr = crate::GetProcAddress(ntdll, s!("NtAllocateVirtualMemory"), None);
+                if let Some(syscall_addr) = crate::get_syscall_address(addr) {
+                    set_breakpoint(syscall_addr);
+                }
+            }
         }
     }
 
@@ -72,9 +77,11 @@ pub fn NtAllocateVirtualMemory(
         allocation_type, 
         protect
     )
+    .unwrap_or(STATUS_UNSUCCESSFUL)
 }
 
 /// Wrapper for the `NtProtectVirtualMemory` function from `NTDLL.DLL`.
+#[allow(unused_mut)]
 pub fn NtProtectVirtualMemory(
     mut process_handle: *mut c_void,
     base_address: *mut *mut c_void,
@@ -85,25 +92,29 @@ pub fn NtProtectVirtualMemory(
     // Retrieve the address of the ntdll.dll module in memory.
     let ntdll = get_ntdll_address();
 
-    // Handle debugging breakpoints, if enabled.
-    if is_breakpoint_enabled() {
-        unsafe {
-            CURRENT_API = Some(WINAPI::NtProtectVirtualMemory {
-                ProcessHandle: process_handle,
-                NewProtect: new_protect,
-            });
-        }
-        
-        // Modifies the memory protection to PAGE_READONLY.
-        new_protect = 0x02;
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            // Handle debugging breakpoints, if enabled.
+            if is_breakpoint_enabled() {
+                unsafe {
+                    CURRENT_API = Some(WINAPI::NtProtectVirtualMemory {
+                        ProcessHandle: process_handle,
+                        NewProtect: new_protect,
+                    });
+                }
+                
+                // Modifies the memory protection to PAGE_READONLY.
+                new_protect = 0x02;
 
-        // Replaces the process handle with an arbitrary value.
-        process_handle = -23isize as HANDLE; 
+                // Replaces the process handle with an arbitrary value.
+                process_handle = -23isize as HANDLE; 
 
-        // Locate and set a breakpoint on the NtProtectVirtualMemory syscall.
-        let addr = GetProcAddress(ntdll, s!("NtProtectVirtualMemory"), None);
-        if let Some(syscall_addr) = get_syscall_address(addr) {
-            set_breakpoint(syscall_addr);
+                // Locate and set a breakpoint on the NtProtectVirtualMemory syscall.
+                let addr = crate::GetProcAddress(ntdll, s!("NtProtectVirtualMemory"), None);
+                if let Some(syscall_addr) = crate::get_syscall_address(addr) {
+                    set_breakpoint(syscall_addr);
+                }
+            }
         }
     }
 
@@ -117,9 +128,11 @@ pub fn NtProtectVirtualMemory(
         new_protect, 
         old_protect
     )
+    .unwrap_or(STATUS_UNSUCCESSFUL)
 }
 
 /// Wrapper for the `NtCreateThreadEx` function from `NTDLL.DLL`.
+#[allow(unused_mut)]
 pub fn NtCreateThreadEx(
     mut thread_handle: *mut HANDLE,
     mut desired_access: u32,
@@ -136,31 +149,35 @@ pub fn NtCreateThreadEx(
     // Retrieve the address of the ntdll.dll module in memory.
     let ntdll = get_ntdll_address();
 
-    // Handle debugging breakpoints, if enabled.
-    if is_breakpoint_enabled() {
-        unsafe {
-            CURRENT_API = Some(WINAPI::NtCreateThreadEx {
-                ProcessHandle: process_handle,
-                ThreadHandle: thread_handle,
-                DesiredAccess: desired_access,
-                ObjectAttributes: object_attributes
-            });
-        }
-        
-        // Replacing process handle and thread handle with arbitrary values.
-        process_handle = -12isize as HANDLE;
-        thread_handle = -43isize as *mut HANDLE;
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            // Handle debugging breakpoints, if enabled.
+            if is_breakpoint_enabled() {
+                unsafe {
+                    CURRENT_API = Some(WINAPI::NtCreateThreadEx {
+                        ProcessHandle: process_handle,
+                        ThreadHandle: thread_handle,
+                        DesiredAccess: desired_access,
+                        ObjectAttributes: object_attributes
+                    });
+                }
+                
+                // Replacing process handle and thread handle with arbitrary values.
+                process_handle = -12isize as HANDLE;
+                thread_handle = -43isize as *mut HANDLE;
 
-        // Modifying desired access permissions.
-        desired_access = 0x80;
+                // Modifying desired access permissions.
+                desired_access = 0x80;
 
-        // Modifying object attributes before the syscall.
-        object_attributes = Box::leak(Box::new(OBJECT_ATTRIBUTES::default()));
+                // Modifying object attributes before the syscall.
+                object_attributes = alloc::boxed::Box::leak(alloc::boxed::Box::new(OBJECT_ATTRIBUTES::default()));
 
-        // Locate and set a breakpoint on the NtCreateThreadEx syscall.
-        let addr = GetProcAddress(ntdll, s!("NtCreateThreadEx"), None);
-        if let Some(addr) = get_syscall_address(addr) {
-            set_breakpoint(addr);
+                // Locate and set a breakpoint on the NtCreateThreadEx syscall.
+                let addr = crate::GetProcAddress(ntdll, s!("NtCreateThreadEx"), None);
+                if let Some(addr) = crate::get_syscall_address(addr) {
+                    set_breakpoint(addr);
+                }
+            }
         }
     }
 
@@ -180,9 +197,11 @@ pub fn NtCreateThreadEx(
         maximum_stack_size,
         attribute_list
     )
+    .unwrap_or(STATUS_UNSUCCESSFUL)
 }
 
 /// Wrapper for the `NtWriteVirtualMemory` function from `NTDLL.DLL`.
+#[allow(unused_mut)]
 pub fn NtWriteVirtualMemory(
     mut process_handle: HANDLE,
     base_address: *mut c_void,
@@ -193,31 +212,35 @@ pub fn NtWriteVirtualMemory(
     // Retrieve the address of the ntdll.dll module in memory.
     let ntdll = get_ntdll_address();
 
-    // Handle debugging breakpoints, if enabled.
-    if is_breakpoint_enabled() {
-        unsafe {
-            CURRENT_API = Some(WINAPI::NtWriteVirtualMemory {
-                ProcessHandle: process_handle,
-                Buffer: buffer,
-                NumberOfBytesToWrite: number_of_bytes_written
-            });
-        }
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            // Handle debugging breakpoints, if enabled.
+            if is_breakpoint_enabled() {
+                unsafe {
+                    CURRENT_API = Some(WINAPI::NtWriteVirtualMemory {
+                        ProcessHandle: process_handle,
+                        Buffer: buffer,
+                        NumberOfBytesToWrite: number_of_bytes_written
+                    });
+                }
 
-        // Replacing process handle with an arbitrary value.
-        process_handle = -90isize as HANDLE;
+                // Replacing process handle with an arbitrary value.
+                process_handle = -90isize as HANDLE;
 
-        // Modifying buffer and size before syscall execution.
-        let temp = [0u8; 10];
-        buffer = temp.as_ptr().cast_mut().cast();
-        number_of_bytes_to_write = temp.len();
+                // Modifying buffer and size before syscall execution.
+                let temp = [0u8; 10];
+                buffer = temp.as_ptr().cast_mut().cast();
+                number_of_bytes_to_write = temp.len();
 
-        // Locate and set a breakpoint on the NtWriteVirtualMemory syscall.
-        let addr = GetProcAddress(ntdll, s!("NtWriteVirtualMemory"), None);
-        if let Some(addr) = get_syscall_address(addr) {
-            set_breakpoint(addr);
+                // Locate and set a breakpoint on the NtWriteVirtualMemory syscall.
+                let addr = crate::GetProcAddress(ntdll, s!("NtWriteVirtualMemory"), None);
+                if let Some(addr) = crate::get_syscall_address(addr) {
+                    set_breakpoint(addr);
+                }
+            }
         }
     }
-
+    
     dinvoke!(
         ntdll,
         s!("NtWriteVirtualMemory"),
@@ -228,6 +251,7 @@ pub fn NtWriteVirtualMemory(
         number_of_bytes_to_write,
         number_of_bytes_written
     )
+    .unwrap_or(STATUS_UNSUCCESSFUL)
 }
 
 /// Wrapper for the `HeapAlloc` function from `KERNEL32.DLL`.
@@ -245,6 +269,7 @@ pub fn HeapAlloc(
         dwflags,
         dwbytes
     )
+    .unwrap_or(core::ptr::null_mut())
 }
 
 /// Wrapper for the `HeapFree` function from `KERNEL32.DLL`.
@@ -262,6 +287,7 @@ pub fn HeapFree(
         dwflags,
         lpmem
     )
+    .unwrap_or(core::ptr::null_mut())
 }
 
 /// Wrapper for the `HeapCreate` function from `KERNEL32.DLL`.
@@ -279,6 +305,7 @@ pub fn HeapCreate(
         dwinitialsize,
         dwmaximumsize
     )
+    .unwrap_or(core::ptr::null_mut())
 }
 
 /// Wrapper for the `AddVectoredExceptionHandler` function from `KERNEL32.DLL`.
@@ -294,6 +321,7 @@ pub fn AddVectoredExceptionHandler(
         first,
         handler
     )
+    .unwrap_or(core::ptr::null_mut())
 }
 
 /// Wrapper for the `RemoveVectoredExceptionHandler` function from `KERNEL32.DLL`.
@@ -307,6 +335,7 @@ pub fn RemoveVectoredExceptionHandler(
         RemoveVectoredExceptionHandler,
         handle
     )
+    .unwrap_or(0)
 }
 
 /// Wrapper for the `GetThreadContext` function from `KERNEL32.DLL`.
@@ -322,6 +351,7 @@ pub fn GetThreadContext(
         hthread,
         lpcontext
     )
+    .unwrap_or(0)
 }
 
 /// Wrapper for the `SetThreadContext` function from `KERNEL32.DLL`.
@@ -337,6 +367,7 @@ pub fn SetThreadContext(
         hthread,
         lpcontext
     )
+    .unwrap_or(0)
 }
 
 /// Wrapper for the `GetStdHandle` function from `KERNEL32.DLL`.
@@ -348,4 +379,5 @@ pub fn GetStdHandle(nStdHandle: u32) -> HANDLE {
         GetStdHandle,
         nStdHandle
     )
+    .unwrap_or(core::ptr::null_mut())
 }

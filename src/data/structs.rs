@@ -15,18 +15,18 @@ use super::{
     }, 
 };
 
-#[cfg(target_arch = "x86_64")]
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub struct IMAGE_NT_HEADERS {
     pub Signature: u32,
     pub FileHeader: IMAGE_FILE_HEADER,
     pub OptionalHeader: IMAGE_OPTIONAL_HEADER64,
 }
 
-#[cfg(target_arch = "x86")]
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_arch = "x86")]
 pub struct IMAGE_NT_HEADERS {
     pub Signature: u32,
     pub FileHeader: IMAGE_FILE_HEADER,
@@ -164,6 +164,90 @@ pub struct IMAGE_EXPORT_DIRECTORY {
     pub AddressOfNameOrdinals: u32,
 }
 
+/// CONTEXT structure representing ARM64
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+#[derive(Clone, Copy)]
+pub struct CONTEXT {
+    pub ContextFlags: u32,
+    pub Cpsr: u32,
+    pub Anonymous: CONTEXT_0,
+    pub Sp: u64,
+    pub Pc: u64,
+    pub V: [ARM64_NT_NEON128; 32],
+    pub Fpcr: u32,
+    pub Fpsr: u32,
+    pub Bcr: [u32; 8],
+    pub Bvr: [u64; 8],
+    pub Wcr: [u32; 2],
+    pub Wvr: [u64; 2],
+}
+
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+#[derive(Clone, Copy)]
+pub union CONTEXT_0 {
+    pub Anonymous: CONTEXT_0_0,
+    pub X: [u64; 31],
+}
+
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+#[derive(Clone, Copy)]
+pub struct CONTEXT_0_0 {
+    pub X0: u64,
+    pub X1: u64,
+    pub X2: u64,
+    pub X3: u64,
+    pub X4: u64,
+    pub X5: u64,
+    pub X6: u64,
+    pub X7: u64,
+    pub X8: u64,
+    pub X9: u64,
+    pub X10: u64,
+    pub X11: u64,
+    pub X12: u64,
+    pub X13: u64,
+    pub X14: u64,
+    pub X15: u64,
+    pub X16: u64,
+    pub X17: u64,
+    pub X18: u64,
+    pub X19: u64,
+    pub X20: u64,
+    pub X21: u64,
+    pub X22: u64,
+    pub X23: u64,
+    pub X24: u64,
+    pub X25: u64,
+    pub X26: u64,
+    pub X27: u64,
+    pub X28: u64,
+    pub Fp: u64,
+    pub Lr: u64,
+}
+
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+#[derive(Clone, Copy)]
+pub union ARM64_NT_NEON128 {
+    pub Anonymous: ARM64_NT_NEON128_0,
+    pub D: [f64; 2],
+    pub S: [f32; 4],
+    pub H: [u16; 8],
+    pub B: [u8; 16],
+}
+
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ARM64_NT_NEON128_0 {
+    pub Low: u64,
+    pub High: i64,
+}
+
+/// CONTEXT structure representing x86_64
 #[repr(C)]
 #[repr(align(16))]
 #[derive(Clone, Copy)]
@@ -217,7 +301,7 @@ pub struct CONTEXT {
     pub LastExceptionFromRip: u64,
 }
 
-/// CONTEXT structure representing 32 bits
+/// CONTEXT structure representing x86
 #[derive(Debug)]
 #[repr(C)]
 #[cfg(target_arch = "x86")]
@@ -259,6 +343,7 @@ pub struct CONTEXT {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_arch = "x86_64")]
 pub union CONTEXT_0 {
     pub FltSave: XSAVE_FORMAT,
     pub Anonymous: CONTEXT_0_0,
@@ -266,6 +351,7 @@ pub union CONTEXT_0 {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_arch = "x86_64")]
 pub struct XSAVE_FORMAT {
     pub ControlWord: u16,
     pub StatusWord: u16,
@@ -287,6 +373,7 @@ pub struct XSAVE_FORMAT {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_arch = "x86_64")]
 pub struct M128A {
     pub Low: u64,
     pub High: i64,
@@ -294,6 +381,7 @@ pub struct M128A {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_arch = "x86_64")]
 pub struct CONTEXT_0_0 {
     pub Header: [M128A; 2],
     pub Legacy: [M128A; 8],
@@ -316,160 +404,36 @@ pub struct CONTEXT_0_0 {
 }
 
 impl Default for CONTEXT {
-    #[cfg(target_arch = "x86_64")]
     fn default() -> Self {
-        Self {
-            P1Home: 0,
-            P2Home: 0,
-            P3Home: 0,
-            P4Home: 0,
-            P5Home: 0,
-            P6Home: 0,
-            ContextFlags: 0,
-            MxCsr: 0,
-            SegCs: 0,
-            SegDs: 0,
-            SegEs: 0,
-            SegFs: 0,
-            SegGs: 0,
-            SegSs: 0,
-            EFlags: 0,
-            Dr0: 0,
-            Dr1: 0,
-            Dr2: 0,
-            Dr3: 0,
-            Dr6: 0,
-            Dr7: 0,
-            Rax: 0,
-            Rcx: 0,
-            Rdx: 0,
-            Rbx: 0,
-            Rsp: 0,
-            Rbp: 0,
-            Rsi: 0,
-            Rdi: 0,
-            R8: 0,
-            R9: 0,
-            R10: 0,
-            R11: 0,
-            R12: 0,
-            R13: 0,
-            R14: 0,
-            R15: 0,
-            Rip: 0,
-            Anonymous: CONTEXT_0::default(),
-            VectorRegister: [M128A::default(); 26],
-            VectorControl: 0,
-            DebugControl: 0,
-            LastBranchToRip: 0,
-            LastBranchFromRip: 0,
-            LastExceptionToRip: 0,
-            LastExceptionFromRip: 0,
-        }
-    }
-    
-    #[cfg(target_arch = "x86")]
-    fn default() -> Self {
-        Self { 
-            ContextFlags: 0,
-            Dr0: 0,
-            Dr1: 0,
-            Dr2: 0,
-            Dr3: 0,
-            Dr6: 0,
-            Dr7: 0,
-            ControlWord: 0,
-            StatusWord: 0,
-            TagWord: 0,
-            ErrorOffset: 0,
-            ErrorSelector: 0,
-            DataOffset: 0,
-            DataSelector: 0,
-            RegisterArea: [0; 80],
-            Spare0: 0,
-            SegGs: 0,
-            SegFs: 0,
-            SegEs: 0,
-            SegDs: 0,
-            Edi: 0,
-            Esi: 0,
-            Ebx: 0,
-            Edx: 0,
-            Ecx: 0,
-            Eax: 0,
-            Ebp: 0,
-            Eip: 0,
-            SegCs: 0,
-            EFlags: 0,
-            Esp: 0,
-            SegSs: 0,
-            ExtendedRegisters: [0; 512]
-        }
+        unsafe { core::mem::zeroed() }
     }
 }
 
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 impl Default for CONTEXT_0 {
     fn default() -> Self {
-        Self {
-            FltSave: XSAVE_FORMAT::default(),
-        }
+        unsafe { core::mem::zeroed() }
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl Default for XSAVE_FORMAT {
     fn default() -> Self {
-        Self {
-            ControlWord: 0,
-            StatusWord: 0,
-            TagWord: 0,
-            Reserved1: 0,
-            ErrorOpcode: 0,
-            ErrorOffset: 0,
-            ErrorSelector: 0,
-            Reserved2: 0,
-            DataOffset: 0,
-            DataSelector: 0,
-            Reserved3: 0,
-            MxCsr: 0,
-            MxCsr_Mask: 0,
-            FloatRegisters: [M128A::default(); 8],
-            XmmRegisters: [M128A::default(); 16],
-            Reserved4: [0; 96],
-        }
+        unsafe { core::mem::zeroed() }
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl Default for M128A {
     fn default() -> Self {
-        Self {
-            Low: 0,
-            High: 0,
-        }
+        unsafe { core::mem::zeroed() }
     }
 }
 
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 impl Default for CONTEXT_0_0 {
     fn default() -> Self {
-        Self {
-            Header: [M128A::default(); 2],
-            Legacy: [M128A::default(); 8],
-            Xmm0: M128A::default(),
-            Xmm1: M128A::default(),
-            Xmm2: M128A::default(),
-            Xmm3: M128A::default(),
-            Xmm4: M128A::default(),
-            Xmm5: M128A::default(),
-            Xmm6: M128A::default(),
-            Xmm7: M128A::default(),
-            Xmm8: M128A::default(),
-            Xmm9: M128A::default(),
-            Xmm10: M128A::default(),
-            Xmm11: M128A::default(),
-            Xmm12: M128A::default(),
-            Xmm13: M128A::default(),
-            Xmm14: M128A::default(),
-            Xmm15: M128A::default(),
-        }
+        unsafe { core::mem::zeroed() }
     }
 }
 

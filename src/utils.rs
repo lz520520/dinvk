@@ -31,7 +31,7 @@ impl Write for ConsoleWriter {
         let kernel32 = GetModuleHandle(obfstr::obfstr!("KERNEL32.DLL"), None);
 
         // Dynamically invoke `WriteConsoleA`
-        dinvoke!(
+        _ = dinvoke!(
             kernel32,
             obfstr::obfstr!("WriteConsoleA"),
             WriteConsoleA,
