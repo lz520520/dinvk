@@ -557,6 +557,20 @@ pub struct SILO_USER_SHARED_DATA {
 }
 
 #[repr(C)]
+pub struct TEB {
+    pub Reserved1: [*mut c_void; 12],
+    pub ProcessEnvironmentBlock: *mut PEB,
+    pub Reserved2: [*mut c_void; 399],
+    pub Reserved3: [u8; 1952],
+    pub TlsSlots: [*mut c_void; 64],
+    pub Reserved4: [u8; 8],
+    pub Reserved5: [*mut c_void; 26],
+    pub ReservedForOle: *mut c_void,
+    pub Reserved6: [*mut c_void; 4],
+    pub TlsExpansionSlots: *mut c_void,
+}
+
+#[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PEB {
     pub InheritedAddressSpace: u8,
