@@ -3,7 +3,7 @@ use obfstr::obfstr as s;
 use core::ffi::c_void;
 use crate::{
     GetModuleHandle, 
-    dinvoke, get_ntdll_address,
+    dinvoke, hash::loselose
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -37,7 +37,7 @@ pub fn NtAllocateVirtualMemory(
     mut protect: u32,
 ) -> NTSTATUS {
     // Retrieve the address of the ntdll.dll module in memory.
-    let ntdll = get_ntdll_address();
+    let ntdll = GetModuleHandle(648, Some(loselose));
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
@@ -90,7 +90,7 @@ pub fn NtProtectVirtualMemory(
     old_protect: *mut u32,
 ) -> NTSTATUS {
     // Retrieve the address of the ntdll.dll module in memory.
-    let ntdll = get_ntdll_address();
+    let ntdll = GetModuleHandle(648, Some(loselose));
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
@@ -147,7 +147,7 @@ pub fn NtCreateThreadEx(
     attribute_list: *mut PS_ATTRIBUTE_LIST
 ) -> NTSTATUS {
     // Retrieve the address of the ntdll.dll module in memory.
-    let ntdll = get_ntdll_address();
+    let ntdll = GetModuleHandle(648, Some(loselose));
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
@@ -210,7 +210,7 @@ pub fn NtWriteVirtualMemory(
     number_of_bytes_written: *mut usize,
 ) -> NTSTATUS {
     // Retrieve the address of the ntdll.dll module in memory.
-    let ntdll = get_ntdll_address();
+    let ntdll = GetModuleHandle(648, Some(loselose));
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
