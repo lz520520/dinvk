@@ -18,8 +18,8 @@ type Functions<'a> = BTreeMap<usize, &'a str>;
 ///
 /// # Returns
 ///
-/// * `Some(*const IMAGE_EXPORT_DIRECTORY)` if the export directory is found.
-/// * `None` if the module is invalid or does not contain an export directory.
+/// * `Some(*const IMAGE_EXPORT_DIRECTORY)` - if the export directory is found.
+/// * `None` - if the module is invalid or does not contain an export directory.
 pub fn get_export_directory(module: *mut c_void) -> Option<*const IMAGE_EXPORT_DIRECTORY> {
     unsafe {
         let nt_header = (module as usize + (*(module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) 
@@ -42,8 +42,8 @@ pub fn get_export_directory(module: *mut c_void) -> Option<*const IMAGE_EXPORT_D
 ///
 /// # Returns
 ///
-/// * `Some(*const IMAGE_NT_HEADERS)` if the NT header is valid.
-/// * `None` if the module is invalid.
+/// * `Some(*const IMAGE_NT_HEADERS)` - if the NT header is valid.
+/// * `None` - if the module is invalid.
 pub fn get_nt_header(module: *mut c_void) -> Option<*const IMAGE_NT_HEADERS> {
     unsafe {
         let nt_header = (module as usize + (*(module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) 
@@ -65,8 +65,8 @@ pub fn get_nt_header(module: *mut c_void) -> Option<*const IMAGE_NT_HEADERS> {
 ///
 /// # Returns
 ///
-/// * `Some(Functions<'static>)` if function exports are found.
-/// * `None` if the module does not export any functions.
+/// * `Some(Functions<'static>)` - if function exports are found.
+/// * `None` - if the module does not export any functions.
 pub fn get_functions_eat(module: *mut c_void) -> Option<Functions<'static>> {
     unsafe {
         // Get the export directory and hash the module
