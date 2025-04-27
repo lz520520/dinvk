@@ -11,7 +11,7 @@
 /// 
 /// ```rust,ignore
 /// let ntdll = get_ntdll_address();
-/// let result = dinvoke!(ntdll,"NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
+/// let result = dinvoke!(ntdll, "NtQueryInformationProcess", extern "system" fn(...) -> u32, arg1, arg2);
 /// ``` 
 #[macro_export]
 macro_rules! dinvoke {
@@ -49,7 +49,8 @@ macro_rules! syscall {
         use $crate::*;
 
         // Retrieve the address of ntdll.dll
-        let ntdll = get_ntdll_address();
+        // We do not use `get_ntdll_address` here, some EDRs may load a fake ntdll.dll and alter the module list.
+        let ntdll = GetModuleHandle(648, Some($crate::hash::loselose));
 
         // Get the address of the specified function in ntdll.dll
         let addr = GetProcAddress(ntdll, $function_name, None);
