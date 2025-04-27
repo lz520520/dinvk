@@ -107,7 +107,6 @@ pub struct IMAGE_OPTIONAL_HEADER64 {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct IMAGE_OPTIONAL_HEADER32 {
-
     pub Magic: IMAGE_OPTIONAL_HEADER_MAGIC,
     pub MajorLinkerVersion: u8,
     pub MinorLinkerVersion: u8,
