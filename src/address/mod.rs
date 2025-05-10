@@ -6,6 +6,7 @@ use core::{
     slice::from_raw_parts
 };
 use crate::{
+    utils::canonicalize_module,
     hash::crc32ba, 
     wrappers::LoadLibraryA,
     data::{
@@ -39,13 +40,12 @@ where
         let mut data_table_entry = (*ldr_data).InMemoryOrderModuleList.Flink as *const LDR_DATA_TABLE_ENTRY;
         let mut list_node = (*ldr_data).InMemoryOrderModuleList.Flink;
 
-        // Save a reference to the head nod for the list
-        let head_node = list_node;
-
         if module.to_string().is_empty() {
-            return (*data_table_entry).Reserved2[0];
+            return (*peb).ImageBaseAddress;
         }
 
+        // Save a reference to the head nod for the list
+        let head_node = list_node;
         while !(*data_table_entry).FullDllName.Buffer.is_null() {
             if (*data_table_entry).FullDllName.Length != 0 {
                 // Converts the buffer from UTF-16 to a `String`
@@ -53,16 +53,18 @@ where
                     (*data_table_entry).FullDllName.Buffer, 
                     ((*data_table_entry).FullDllName.Length / 2) as usize
                 );
-
+            
                 // Try interpreting `module` as a numeric hash (u32)
-                let dll_file_name = String::from_utf16_lossy(buffer).to_uppercase();
+                let mut dll_file_name = String::from_utf16_lossy(buffer).to_uppercase();
                 if let Ok(dll_hash) = module.to_string().parse::<u32>() {
                     if dll_hash == hash(&dll_file_name) {
                         return (*data_table_entry).Reserved2[0];
                     }
                 } else {
                     // If it is not an `u32`, it is treated as a string
-                    if dll_file_name == module.to_string().to_uppercase() {
+                    let module = canonicalize_module(&module.to_string());
+                    dll_file_name = canonicalize_module(&dll_file_name);
+                    if dll_file_name == module {
                         return (*data_table_entry).Reserved2[0];
                     }
                 }

@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::{String, ToString}, vec::Vec};
 use core::{fmt::{self, Write}, ptr};
 use crate::{
     data::WriteConsoleA, 
@@ -44,4 +44,27 @@ impl Write for ConsoleWriter {
 
         Ok(())
     }
+}
+
+/// Normalizes a module (DLL) name for consistent comparison with loaded module names.
+///
+/// This function:
+/// - Strips any path, keeping only the filename.
+/// - Converts the name to uppercase for case-insensitive comparison.
+/// - Removes the `.DLL` extension if present (case-insensitive).
+///
+/// Useful for matching variations like `"kernel32.dll"`, `"KERNEL32"`, or
+/// `"C:\\Windows\\System32\\kernel32.DlL"` to a consistent `"KERNEL32"`.
+///
+/// # Example
+/// 
+/// ```rs
+/// assert_eq!(canonicalize_module("kernel32.dll"), "KERNEL32");
+/// assert_eq!(canonicalize_module("C:\\Windows\\System32\\KERNEL32"), "KERNEL32");
+/// assert_eq!(canonicalize_module("KERNEL32.DlL"), "KERNEL32");
+/// ```
+pub(crate) fn canonicalize_module(name: &str) -> String {
+    let file = name.rsplit(['\\', '/']).next().unwrap_or(name);
+    let upper = file.to_ascii_uppercase();
+    upper.trim_end_matches(".DLL").to_string()
 }
