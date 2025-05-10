@@ -49,12 +49,6 @@ Add `dinvk` to your project by updating your `Cargo.toml`:
 cargo add dinvk
 ```
 
-Or manually add the dependency:
-```toml
-[dependencies]
-dinvk = "<version>"
-```
-
 ## Usage
 
 `dinvk` provides several features for invoking code dynamically, performing indirect syscalls and manipulating exported modules and APIs. Below are detailed examples of how to use each feature.
