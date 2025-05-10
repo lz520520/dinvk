@@ -39,6 +39,9 @@ where
         let mut data_table_entry = (*ldr_data).InMemoryOrderModuleList.Flink as *const LDR_DATA_TABLE_ENTRY;
         let mut list_node = (*ldr_data).InMemoryOrderModuleList.Flink;
 
+        // Save a reference to the head nod for the list
+        let head_node = list_node;
+
         if module.to_string().is_empty() {
             return (*data_table_entry).Reserved2[0];
         }
@@ -67,6 +70,12 @@ where
 
             // Moves to the next node in the list of modules
             list_node = (*list_node).Flink;
+
+            // Break out of loop if all of the nodes have been checked
+            if list_node == head_node {
+                break
+            }
+
             data_table_entry = list_node as *const LDR_DATA_TABLE_ENTRY
         }
     }
