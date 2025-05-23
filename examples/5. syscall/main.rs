@@ -6,7 +6,7 @@ use dinvk::{
 
 fn main() -> Result<(), NTSTATUS> {
     // Alternatively, you can use Dll::Vertdll or Dll::Iumdll on x86_64
-    Dll::use_dll(Dll::Win32u);
+    Dll::use_dll(Dll::Iumdll);
 
     // Memory allocation using a syscall
     let mut addr = null_mut::<c_void>();
@@ -16,6 +16,8 @@ fn main() -> Result<(), NTSTATUS> {
         eprintln!("@ NtAllocateVirtualMemory Failed With Status: {}", status);
         return Err(status);
     }
+
+    println!("{:?}", addr);
 
     Ok(())
 }
