@@ -1,6 +1,6 @@
 #![cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 
-use core::sync::atomic::{Ordering, AtomicUsize};
+use core::{sync::atomic::{AtomicUsize, Ordering}};
 
 /// The global variable that stores the currently selected DLL for system calls.
 ///
@@ -29,6 +29,9 @@ pub enum Dll {
 }
 
 impl Dll {
+    /// XOR key used for static string obfuscation.
+    const XOR_KEY: u8 = 0x55;
+
     /// Sets the default DLL to be used for system calls.
     ///
     /// # Arguments
@@ -48,21 +51,6 @@ impl Dll {
     }
 
     /// Retrieves the currently selected DLL for system calls.
-    ///
-    /// # Returns
-    ///
-    /// * The currently set DLL as a [`Dll`] enum variant.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// // Retrieve the currently selected DLL
-    /// let dll = Dll::current();
-    ///
-    /// println!("Current DLL: {}", dll);
-    /// ```
     pub fn current() -> Dll {
         match DEFAULT_DLL.load(Ordering::Relaxed) {
             #[cfg(target_arch = "x86_64")]
@@ -75,51 +63,97 @@ impl Dll {
     }
 
     /// Returns the function name associated with the selected DLL, if applicable.
-    ///
-    /// # Returns
-    ///
-    /// * A static string slice (`&str`) containing the function name or an empty string.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// let dll = Dll::Win32u;
-    /// println!("Function: {}", dll.function_hash());
-    /// ```
     pub fn function_hash(&self) -> u32 {
         match self {
             Dll::Ntdll => 0,
-            Dll::Win32u => 2604093150u32,
+            Dll::Win32u => 2_604_093_150,
             #[cfg(target_arch = "x86_64")]
-            Dll::Iumdll => 75139374u32,
+            Dll::Iumdll => 75_139_374,
             #[cfg(target_arch = "x86_64")]
-            Dll::Vertdll => 2237456582u32,
+            Dll::Vertdll => 2_237_456_582,
+        }
+    }
+
+    /// Returns a precomputed hash of the DLL name itself.
+    pub fn hash(&self) -> u32 {
+        match self {
+            Dll::Ntdll => 4_168_839_019,
+            Dll::Win32u => 1_292_941_823,
+            #[cfg(target_arch = "x86_64")]
+            Dll::Iumdll => 1_162_714_123,
+            #[cfg(target_arch = "x86_64")]
+            Dll::Vertdll => 218_821_999,
+        }
+    }
+
+    /// Returns the DLL name as a null-terminated string (decoded from XOR obfuscation).
+    pub fn name(&self) -> &'static str {
+        match self {
+            Dll::Ntdll => decode(&[
+                b'n' ^ Self::XOR_KEY,
+                b't' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'.' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+            ]),
+            Dll::Win32u => decode(&[
+                b'w' ^ Self::XOR_KEY,
+                b'i' ^ Self::XOR_KEY,
+                b'n' ^ Self::XOR_KEY,
+                b'3' ^ Self::XOR_KEY,
+                b'2' ^ Self::XOR_KEY,
+                b'u' ^ Self::XOR_KEY,
+                b'.' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+            ]),
+            #[cfg(target_arch = "x86_64")]
+            Dll::Iumdll => decode(&[
+                b'i' ^ Self::XOR_KEY,
+                b'u' ^ Self::XOR_KEY,
+                b'm' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'.' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+            ]),
+            #[cfg(target_arch = "x86_64")]
+            Dll::Vertdll => decode(&[
+                b'v' ^ Self::XOR_KEY,
+                b'e' ^ Self::XOR_KEY,
+                b'r' ^ Self::XOR_KEY,
+                b't' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'.' ^ Self::XOR_KEY,
+                b'd' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+                b'l' ^ Self::XOR_KEY,
+            ]),
         }
     }
 }
 
-impl core::fmt::Display for Dll {
-    /// Formats the `Dll` variant as its corresponding DLL file name.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use dinvk::Dll;
-    ///
-    /// let dll = Dll::Win32u;
-    /// println!("DLL: {}", dll);
-    /// ```
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let name: &[u8] = match self {
-            Dll::Ntdll => &[0x4E, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-            Dll::Win32u => &[0x57, 0x49, 0x4E, 0x13, 0x12, 0x55, 0x0E, 0x44, 0x4C, 0x4C],
-            #[cfg(target_arch = "x86_64")]
-            Dll::Iumdll => &[0x49, 0x55, 0x4D, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-            #[cfg(target_arch = "x86_64")]
-            Dll::Vertdll => &[0x56, 0x45, 0x52, 0x54, 0x44, 0x4C, 0x4C, 0x0E, 0x44, 0x4C, 0x4C],
-        };
-        write!(f, "{}", name.iter().map(|&c| (c ^ 0x20) as char).collect::<alloc::string::String>())
+/// Decodes a DLL name from a XOR-obfuscated byte array.
+///
+/// This is used to avoid embedding literal DLL names in the binary.
+fn decode(input: &[u8]) -> &'static str {
+    const MAX: usize = 12;
+    static mut DECODED: [u8; MAX] = [0; MAX];
+    let len = input.len();
+
+    for i in 0..len {
+        unsafe { DECODED[i] = input[i] ^ Dll::XOR_KEY };
     }
+
+    unsafe { core::str::from_utf8_unchecked(&DECODED[..len]) }
 }

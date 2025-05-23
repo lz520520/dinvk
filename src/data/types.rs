@@ -1,5 +1,5 @@
-///! This module defines type aliases and function signatures for interacting with system-level APIs
-///! and memory management operations.
+//! This module defines type aliases and function signatures for interacting with system-level APIs
+//! and memory management operations.
 
 use core::ffi::c_void;
 use super::{
@@ -25,8 +25,8 @@ pub type PPS_POST_PROCESS_INIT_ROUTINE = unsafe extern "system" fn();
 
 pub type LoadLibraryA = unsafe extern "system" fn(fnlpLibFileName: *const u8) -> *mut c_void;
 pub type RemoveVectoredExceptionHandler = unsafe extern "system" fn(handle: *mut c_void) -> u32;
-pub type GetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *mut CONTEXT) -> i32;
-pub type SetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *const CONTEXT) -> i32;
+pub type NtGetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *mut CONTEXT) -> i32;
+pub type NtSetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *const CONTEXT) -> i32;
 pub type RtlCaptureContext = unsafe extern "system" fn(contextrecord: *mut CONTEXT);
 pub type RtlCreateTimerQueue = unsafe extern "system" fn(TimerQueueHandle: *mut HANDLE) -> NTSTATUS;
 pub type HeapAlloc = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLAGS, dwbytes: usize) -> *mut c_void;
@@ -36,6 +36,11 @@ pub type AddVectoredExceptionHandler = unsafe extern "system" fn(first: u32, han
 pub type OutputDebugStringA = unsafe extern "system" fn(lpOutputString: *const u8);
 pub type WriteConsoleA = unsafe extern "system" fn(hConsoleOutput: HANDLE, lpBuffer: *const u8, nNumberOfCharsToWrite: u32, lpNumberOfCharsWritten: *mut u32, lpReserved: *mut c_void);
 pub type GetStdHandle = unsafe extern "system" fn(nStdHandle: u32) -> HANDLE;
+pub type RtlCreateHeap = unsafe extern "system" fn(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE;
+pub type RtlAllocateHeap = unsafe extern "system" fn(heap: HANDLE, flags: u32, size: usize) -> *mut c_void;
+pub type RtlFreeHeap = unsafe extern "system" fn(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8;
+pub type RtlDestroyHeap = unsafe extern "system" fn(heap: *mut c_void) -> i8;
+
 pub type NtCreateEvent = unsafe extern "system" fn(
     EventHandle: *mut HANDLE,
     DesiredAccess: u32, 
@@ -107,3 +112,4 @@ pub type RtlCreateTimer = unsafe extern "system" fn(
     Period: u32,
     Flags: u32
 ) -> NTSTATUS;
+

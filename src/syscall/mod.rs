@@ -5,14 +5,11 @@ use core::{
 };
 use crate::{ 
     hash::jenkins3, 
-    parse::get_export_directory,
+    parse::Pe,
 };
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::{LoadLibraryA, GetModuleHandle, GetProcAddress};
-
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use alloc::string::ToString;
 
 /// Assembly-level utilities and inline assembly code used in the crate.
 ///
@@ -57,7 +54,9 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = get_export_directory(module)?;
+        let export_dir = Pe::new(module)
+            .exports()
+            .directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
         
@@ -87,7 +86,7 @@ pub fn ssn(
                 .unwrap_or("");
     
             // Comparation by Hash (Default `jenkins3`)
-            if jenkins3(&name) == hash {
+            if jenkins3(name) == hash {
                 // Hells Gate
                 // MOV R10, RCX
                 // MOV RCX, <ssn>
@@ -194,7 +193,9 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = get_export_directory(module)?;
+        let export_dir = Pe::new(module)
+            .exports()
+            .directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
         
@@ -263,7 +264,9 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = get_export_directory(module)?;
+        let export_dir = Pe::new(module)
+            .exports()
+            .directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
 
@@ -383,9 +386,9 @@ pub fn get_syscall_address(mut address: *mut c_void) -> Option<u64> {
         // in case ntdll is not chosen to invoke the syscall
         let dll = Dll::current();
         if dll != Dll::Ntdll {
-            let mut h_module = GetModuleHandle(dll.to_string(), None);
+            let mut h_module = GetModuleHandle(dll.hash(), Some(crate::hash::crc32ba));
             if h_module.is_null() {
-                h_module = LoadLibraryA(&dll.to_string());
+                h_module = LoadLibraryA(dll.name());
             }
 
             address = GetProcAddress(h_module, dll.function_hash(), Some(jenkins3));
@@ -435,9 +438,9 @@ pub fn get_syscall_address(address: *mut c_void) -> Option<u32> {
         // Here we will use `win32u.dll`, in case ntdll is not chosen to invoke the syscall
         let dll = Dll::current();
         if dll != Dll::Ntdll {
-            let mut h_module = GetModuleHandle(dll.to_string(), None);
+            let mut h_module = GetModuleHandle(dll.hash(), Some(crate::hash::crc32ba));
             if h_module.is_null() {
-                h_module = LoadLibraryA(&dll.to_string());
+                h_module = LoadLibraryA(dll.name());
             }
 
             address = GetProcAddress(h_module, dll.function_hash(), Some(jenkins3)).cast::<u8>();

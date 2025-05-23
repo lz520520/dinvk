@@ -46,7 +46,7 @@ pub fn crc32ba(string: &str) -> u32 {
 /// println!("Jenkins3 hash: {}", hash);
 /// ```
 pub fn jenkins3(string: &str) -> u32 {
-    let mut a: u32 = 0xDEAD_BEEF + string.len() as u32 + 0;
+    let mut a: u32 = 0xDEAD_BEEF + string.len() as u32;
     let mut b: u32 = a;
     let mut c: u32 = a;
 
@@ -242,9 +242,9 @@ pub fn murmur3(string: &str) -> u32 {
 
     if remainder.len() == 3 { k ^= (remainder[2] as u32) << 16; }
     if remainder.len() >= 2 { k ^= (remainder[1] as u32) << 8; }
-    if remainder.len() >= 1 { k ^= remainder[0] as u32; }
+    if !remainder.is_empty() { k ^= remainder[0] as u32; }
 
-    if remainder.len() > 0 {
+    if !remainder.is_empty() {
         k = k.wrapping_mul(C1);
         k = k.rotate_left(15);
         k = k.wrapping_mul(C2);
@@ -401,7 +401,7 @@ pub fn ap(string: &str) -> u32 {
         if i & 1 == 0 {
             hash ^= (hash << 7) ^ (byte as u32).wrapping_mul(hash >> 3);
         } else {
-            hash ^= !((hash << 11) + (byte as u32) ^ (hash >> 5));
+            hash ^= ((hash << 11) + (byte as u32)) ^ (hash >> 5)
         }
     }
 

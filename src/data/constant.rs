@@ -1,9 +1,10 @@
-///! This module provides key constants for interacting with APIs
+//! This module provides key constants for interacting with APIs
 
 use super::types::IMAGE_DIRECTORY_ENTRY;
 
 pub const IMAGE_NT_SIGNATURE: u32 = 17744u32;
 pub const IMAGE_DIRECTORY_ENTRY_EXPORT: IMAGE_DIRECTORY_ENTRY = 0u16;
+pub const IMAGE_DIRECTORY_ENTRY_EXCEPTION: usize = 3;
 pub const EXCEPTION_SINGLE_STEP: i32 = 0x80000004_u32 as _;
 pub const EXCEPTION_CONTINUE_EXECUTION: i32 = -1;
 pub const EXCEPTION_CONTINUE_SEARCH: i32 = 0;

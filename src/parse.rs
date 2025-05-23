@@ -1,107 +1,204 @@
-use core::{ffi::{c_void, CStr}, slice::from_raw_parts};
-use alloc::collections::btree_map::BTreeMap;
-use crate::data::{
-    IMAGE_DOS_HEADER, 
-    IMAGE_EXPORT_DIRECTORY, 
-    IMAGE_NT_HEADERS, 
-    IMAGE_NT_SIGNATURE
+use core::{
+    ffi::{c_void, CStr},
+    slice::from_raw_parts,
 };
+use alloc::collections::BTreeMap;
+use crate::data::*;
 
 /// Maps exported function addresses to their respective names.
-type Functions<'a> = BTreeMap<usize, &'a str>;
+pub type Functions<'a> = BTreeMap<usize, &'a str>;
 
-/// Retrieves the export directory from a loaded module.
-///
-/// # Arguments
-///
-/// * `module` - A pointer to the module base address.
-///
-/// # Returns
-///
-/// * `Some(*const IMAGE_EXPORT_DIRECTORY)` - if the export directory is found.
-/// * `None` - if the module is invalid or does not contain an export directory.
-pub fn get_export_directory(module: *mut c_void) -> Option<*const IMAGE_EXPORT_DIRECTORY> {
-    unsafe {
-        let nt_header = (module as usize + (*(module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) 
-            as *const IMAGE_NT_HEADERS;
+/// Portable Executable (PE) abstraction over a module's in-memory image.
+#[derive(Debug)]
+pub struct Pe {
+    /// Base address of the loaded module.
+    pub base: *mut c_void,
+}
 
-        if (*nt_header).Signature != IMAGE_NT_SIGNATURE {
-            return None;
+impl Pe {
+    /// Creates a new `Pe` instance from a module base.
+    ///
+    /// # Safety
+    /// Caller must ensure `base` is a valid PE module.
+    #[inline]
+    pub fn new(base: *mut c_void) -> Self {
+        Self { base }
+    }
+
+    /// Returns the DOS header of the module.
+    #[inline]
+    pub fn dos_header(&self) -> *const IMAGE_DOS_HEADER {
+        self.base as *const IMAGE_DOS_HEADER
+    }
+
+    /// Returns a pointer to the `IMAGE_NT_HEADERS`, if valid.
+    pub fn nt_header(&self) -> Option<*const IMAGE_NT_HEADERS> {
+        unsafe {
+            let dos = self.base as *const IMAGE_DOS_HEADER;
+            let nt = (self.base as usize + (*dos).e_lfanew as usize) as *const IMAGE_NT_HEADERS;
+
+            if (*nt).Signature == IMAGE_NT_SIGNATURE {
+                Some(nt)
+            } else {
+                None
+            }
         }
+    }
 
-        let data_directory = (*nt_header).OptionalHeader.DataDirectory[0];
-        Some((module as usize + data_directory.VirtualAddress as usize) as *const IMAGE_EXPORT_DIRECTORY)
+    /// Returns all section headers in the PE.
+    pub fn sections(&self) -> Option<&[IMAGE_SECTION_HEADER]> {
+        unsafe {
+            let nt = self.nt_header()?;
+            let first_section = (nt as *const u8)
+                .add(size_of::<IMAGE_NT_HEADERS>()) as *const IMAGE_SECTION_HEADER;
+            Some(from_raw_parts(first_section, (*nt).FileHeader.NumberOfSections as usize))
+        }
+    }
+
+    /// Finds the name of the section containing a specific RVA.
+    pub fn section_name_by_rva(&self, rva: u32) -> Option<&str> {
+        self.sections()?.iter().find_map(|sec| {
+            let start = sec.VirtualAddress;
+            let end = start + unsafe { sec.Misc.VirtualSize };
+            if rva >= start && rva < end {
+                let name = unsafe { core::str::from_utf8_unchecked(&sec.Name[..]) };
+                Some(name.trim_end_matches('\0'))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Finds a section by its name.
+    pub fn section_by_name(&self, name: &str) -> Option<&IMAGE_SECTION_HEADER> {
+        self.sections()?.iter().find(|sec| {
+            let raw_name = unsafe { core::str::from_utf8_unchecked(&sec.Name) };
+            raw_name.trim_end_matches('\0') == name
+        })
+    }
+
+    /// Exports helper
+    #[inline]
+    pub fn exports(&self) -> PeExports<'_> {
+        PeExports { pe: self }
+    }
+
+    /// Unwind helper
+    #[inline]
+    pub fn unwind(&self) -> PeUnwind<'_> {
+        PeUnwind { pe: self }
     }
 }
 
-/// Retrieves the NT header from a loaded module.
-///
-/// # Arguments
-///
-/// * `module` - A pointer to the module base address.
-///
-/// # Returns
-///
-/// * `Some(*const IMAGE_NT_HEADERS)` - if the NT header is valid.
-/// * `None` - if the module is invalid.
-pub fn get_nt_header(module: *mut c_void) -> Option<*const IMAGE_NT_HEADERS> {
-    unsafe {
-        let nt_header = (module as usize + (*(module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) 
-            as *const IMAGE_NT_HEADERS;
+/// Provides access to the export table of a PE image.
+#[derive(Debug)]
+pub struct PeExports<'a> {
+    /// Reference to the parsed PE image.
+    pub pe: &'a Pe,
+}
 
-        if (*nt_header).Signature != IMAGE_NT_SIGNATURE {
-            return None;
+impl<'a> PeExports<'a> {
+    /// Returns a pointer to the `IMAGE_EXPORT_DIRECTORY`, if present.
+    pub fn directory(&self) -> Option<*const IMAGE_EXPORT_DIRECTORY> {
+        unsafe {
+            let nt = self.pe.nt_header()?;
+            let dir = (*nt).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT as usize];
+
+            if dir.VirtualAddress == 0 {
+                return None;
+            }
+
+            Some((self.pe.base as usize + dir.VirtualAddress as usize) as *const IMAGE_EXPORT_DIRECTORY)
         }
+    }
 
-        Some(nt_header)
+    /// Returns a map of exported function addresses and their names.
+    pub fn functions(&self) -> Option<Functions<'a>> {
+        unsafe {
+            let base = self.pe.base as usize;
+            let dir = self.directory()?;
+
+            let names = from_raw_parts(
+                (base + (*dir).AddressOfNames as usize) as *const u32,
+                (*dir).NumberOfNames as usize,
+            );
+
+            let funcs = from_raw_parts(
+                (base + (*dir).AddressOfFunctions as usize) as *const u32,
+                (*dir).NumberOfFunctions as usize,
+            );
+
+            let ords = from_raw_parts(
+                (base + (*dir).AddressOfNameOrdinals as usize) as *const u16,
+                (*dir).NumberOfNames as usize,
+            );
+
+            let mut map = BTreeMap::new();
+            for i in 0..(*dir).NumberOfNames as usize {
+                let ordinal = ords[i] as usize;
+                let addr = base + funcs[ordinal] as usize;
+                let name_ptr = (base + names[i] as usize) as *const i8;
+
+                let name = CStr::from_ptr(name_ptr).to_str().unwrap_or("");
+                map.insert(addr, name);
+            }
+
+            Some(map)
+        }
     }
 }
 
-/// Retrieves the function export address table (EAT) from a module.
-///
-/// # Arguments
-///
-/// * `module` - A pointer to the module base address.
-///
-/// # Returns
-///
-/// * `Some(Functions<'static>)` - if function exports are found.
-/// * `None` - if the module does not export any functions.
-pub fn get_functions_eat(module: *mut c_void) -> Option<Functions<'static>> {
-    unsafe {
-        // Get the export directory and hash the module
-        let export_dir = get_export_directory(module)?;
-        let module = module as usize;
-        
-        // Retrieve function names
-        let names = from_raw_parts(
-            (module + (*export_dir).AddressOfNames as usize) as *const u32, 
-            (*export_dir).NumberOfNames as usize
-        );
+/// Provides access to the unwind (exception handling) information of a PE image.
+#[derive(Debug)]
+pub struct PeUnwind<'a> {
+    /// Reference to the parsed PE image.
+    pub pe: &'a Pe,
+}
 
-        // Retrieve function addresses
-        let functions = from_raw_parts(
-            (module + (*export_dir).AddressOfFunctions as usize) as *const u32, 
-            (*export_dir).NumberOfFunctions as usize
-        );
+impl<'a> PeUnwind<'a> {
+    /// Returns the address of the unwind/exception table.
+    pub fn directory(&self) -> Option<*const IMAGE_RUNTIME_FUNCTION> {
+        let nt = self.pe.nt_header()?;
+        let dir = unsafe {
+            (*nt).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION]
+        };
 
-        // Retrieve function ordinals
-        let ordinals = from_raw_parts(
-            (module + (*export_dir).AddressOfNameOrdinals as usize) as *const u16, 
-            (*export_dir).NumberOfNames as usize
-        );
-
-        let mut apis = Functions::new(); 
-        for i in 0..(*export_dir).NumberOfNames as isize {
-            let ordinal = ordinals[i as usize] as usize;
-            let address = (module + functions[ordinal] as usize) as usize;
-            let name = CStr::from_ptr((module + names[i as usize] as usize) as *const i8)
-                .to_str()
-                .unwrap_or("");
-
-            apis.insert(address, name);
+        if dir.VirtualAddress == 0 {
+            return None;
         }
-    
-        Some(apis)
+
+        Some((self.pe.base as usize + dir.VirtualAddress as usize) as *const IMAGE_RUNTIME_FUNCTION)
+    }
+
+    /// Returns all runtime function entries.
+    pub fn entries(&self) -> Option<&'a [IMAGE_RUNTIME_FUNCTION]> {
+        let nt = self.pe.nt_header()?;
+        let dir = unsafe {
+            (*nt).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION]
+        };
+
+        if dir.VirtualAddress == 0 || dir.Size == 0 {
+            return None;
+        }
+
+        let addr = (self.pe.base as usize + dir.VirtualAddress as usize) as *const IMAGE_RUNTIME_FUNCTION;
+        let len = dir.Size as usize / size_of::<IMAGE_RUNTIME_FUNCTION>();
+
+        Some(unsafe { from_raw_parts(addr, len) })
+    }
+
+    /// Finds a runtime function by its RVA.
+    pub fn function_by_offset(&self, offset: u32) -> Option<&'a IMAGE_RUNTIME_FUNCTION> {
+        self.entries()?.iter().find(|f| f.BeginAddress == offset)
+    }
+
+    /// Gets the size in bytes of a function using the unwind table.
+    pub fn function_size(&self, func: *mut c_void) -> Option<u64> {
+        let offset = (func as usize - self.pe.base as usize) as u32;
+        let entry = self.function_by_offset(offset)?;
+
+        let start = self.pe.base as u64 + entry.BeginAddress as u64;
+        let end = self.pe.base as u64 + entry.EndAddress as u64;
+        Some(end - start)
     }
 }

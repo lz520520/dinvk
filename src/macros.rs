@@ -21,11 +21,9 @@ macro_rules! dinvoke {
         if address.is_null() {
             None
         } else {
-            unsafe {
-                // Transmute the function pointer to the desired type and invoke it with the provided arguments.
-                let func = core::mem::transmute::<_, $ty>(address);
-                Some(func($($arg),*))
-            }
+            // Transmute the function pointer to the desired type and invoke it with the provided arguments.
+            let func = unsafe { core::mem::transmute::<*mut core::ffi::c_void, $ty>(address) };
+            Some(unsafe { func($($arg),*) })
         }
     }};
 }
@@ -49,8 +47,7 @@ macro_rules! syscall {
         use $crate::*;
 
         // Retrieve the address of ntdll.dll
-        // We do not use `get_ntdll_address` here, some EDRs may load a fake ntdll.dll and alter the module list.
-        let ntdll = GetModuleHandle(648, Some($crate::hash::loselose));
+        let ntdll = get_ntdll_address();
 
         // Get the address of the specified function in ntdll.dll
         let addr = GetProcAddress(ntdll, $function_name, None);
@@ -121,5 +118,28 @@ macro_rules! dprintln {
         
         let mut console = $crate::ConsoleWriter;
         let _ = writeln!(console, $($arg)*);
+    }};
+}
+
+/// Converts a Rust `&str` into a null-terminated C-style string pointer (`*const u8`) at compile time..
+///
+/// # Arguments
+///
+/// * `$s` - A string slice (`&str`) to convert.
+///
+/// # Returns
+///
+/// * `*const u8` — A raw pointer to a null-terminated buffer.
+#[macro_export]
+macro_rules! cstr {
+    ($s:expr) => {{
+        let src = $s.as_bytes();
+        let mut buf = [0u8; 500];
+
+        let len = core::cmp::min(src.len(), buf.len() - 1);
+        buf[..len].copy_from_slice(&src[..len]);
+        buf[len] = 0;
+
+        buf.as_ptr()
     }};
 }

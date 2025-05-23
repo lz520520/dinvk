@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use core::ptr::addr_of_mut;
 use core::sync::atomic::{Ordering, AtomicBool};
-use crate::{GetThreadContext, SetThreadContext};
+use crate::{NtGetThreadContext, NtSetThreadContext};
 use crate::data::{
     CONTEXT, CONTEXT_DEBUG_REGISTERS_AMD64, EXCEPTION_SINGLE_STEP,
     EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH, 
@@ -70,21 +70,21 @@ pub(crate) fn set_breakpoint<T: Into<u64>>(address: T) {
         ..Default::default()
     };
 
-    GetThreadContext(-2isize as HANDLE, &mut ctx);
+    NtGetThreadContext(-2isize as HANDLE, &mut ctx);
 
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "x86_64")] {
             ctx.Dr0 = address.into();
             ctx.Dr6 = 0x00;
-            ctx.Dr7 = set_dr7_bits(ctx.Dr7, 0 * 2, 1, 1);
+            ctx.Dr7 = set_dr7_bits(ctx.Dr7, 0, 1, 1);
         } else {
             ctx.Dr0 = address.into() as u32;
             ctx.Dr6 = 0x00;
-            ctx.Dr7 = set_dr7_bits(ctx.Dr7 as u64, 0 * 2, 1, 1) as u32;
+            ctx.Dr7 = set_dr7_bits(ctx.Dr7 as u64, 0, 1, 1) as u32;
         }
     }
 
-    SetThreadContext(-2isize as HANDLE, &ctx);
+    NtSetThreadContext(-2isize as HANDLE, &ctx);
 }
 
 /// Modifies specific bits in the `DR7` register.
@@ -152,13 +152,14 @@ pub enum WINAPI {
 /// # Arguments
 /// 
 /// * `exceptioninfo` - A pointer to the [`EXCEPTION_POINTERS`] structure containing information
-/// about the current exception, including the CPU context and exception code.
+///     about the current exception, including the CPU context and exception code.
 ///
 /// # Returns
 /// 
 /// * `EXCEPTION_CONTINUE_EXECUTION` - If the exception was handled.
 /// * `EXCEPTION_CONTINUE_SEARCH` - If the exception was not handled. 
 #[cfg(target_arch = "x86_64")]
+#[allow(unsafe_op_in_unsafe_fn)]
 pub unsafe extern "system" fn veh_handler(exceptioninfo: *mut EXCEPTION_POINTERS) -> i32 {
     if !is_breakpoint_enabled() || (*(*exceptioninfo).ExceptionRecord).ExceptionCode != EXCEPTION_SINGLE_STEP {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -209,7 +210,7 @@ pub unsafe extern "system" fn veh_handler(exceptioninfo: *mut EXCEPTION_POINTERS
 
             (*context).Dr0 = 0x00;
             (*context).Dr6 = 0x00;
-            (*context).Dr7 = set_dr7_bits((*context).Dr7, 0 * 2, 1, 0);
+            (*context).Dr7 = set_dr7_bits((*context).Dr7, 0, 1, 0);
         }
 
         return EXCEPTION_CONTINUE_EXECUTION;
@@ -230,6 +231,7 @@ pub unsafe extern "system" fn veh_handler(exceptioninfo: *mut EXCEPTION_POINTERS
 /// * `EXCEPTION_CONTINUE_EXECUTION` - If the exception was handled.
 /// * `EXCEPTION_CONTINUE_SEARCH` - If the exception was not handled. 
 #[cfg(target_arch = "x86")]
+#[allow(unsafe_op_in_unsafe_fn)]
 pub unsafe extern "system" fn veh_handler(exceptioninfo: *mut EXCEPTION_POINTERS) -> i32 {
     if !is_breakpoint_enabled() || (*(*exceptioninfo).ExceptionRecord).ExceptionCode != EXCEPTION_SINGLE_STEP {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -280,7 +282,7 @@ pub unsafe extern "system" fn veh_handler(exceptioninfo: *mut EXCEPTION_POINTERS
 
             (*context).Dr0 = 0x00;
             (*context).Dr6 = 0x00;
-            (*context).Dr7 = set_dr7_bits((*context).Dr7, 0 * 2, 1, 0) as u32;
+            (*context).Dr7 = set_dr7_bits((*context).Dr7, 0, 1, 0) as u32;
         }
 
         return EXCEPTION_CONTINUE_EXECUTION;

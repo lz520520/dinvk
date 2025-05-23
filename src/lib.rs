@@ -1,13 +1,19 @@
 #![no_std]
 #![doc = include_str!("../README.md")]
 #![allow(non_snake_case, non_camel_case_types)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::missing_transmute_annotations,
+    clippy::missing_safety_doc,
+    clippy::macro_metavars_in_unsafe
+)]
 
 // Allow usage of `alloc` crate for heap-allocated types.
 extern crate alloc;
 
 // Internal modules
-mod address;
-mod wrappers;
+mod functions;
 mod macros;
 mod module;
 mod syscall;
@@ -37,8 +43,8 @@ pub mod allocator;
 
 // Re-exports for easier usage
 pub use syscall::*;
-pub use wrappers::*;
-pub use address::*;
+pub use functions::*;
 pub use module::*;
+pub use module::ldr::*;
 pub use utils::*;
 pub use str::*;

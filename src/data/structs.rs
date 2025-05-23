@@ -1,4 +1,4 @@
-///! This module defines core data structures and their layouts.
+//! This module defines core data structures and their layouts.
 
 use bitflags::bitflags;
 use core::{ffi::c_void, ptr::null_mut};
@@ -556,6 +556,7 @@ pub struct SILO_USER_SHARED_DATA {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct TEB {
     pub Reserved1: [*mut c_void; 12],
     pub ProcessEnvironmentBlock: *mut PEB,
@@ -1082,5 +1083,35 @@ pub struct LDR_DATA_TABLE_ENTRY {
 #[repr(C)]
 pub union LDR_DATA_TABLE_ENTRY_0 {
     pub CheckSum: u32,
-    pub Reserved6: *mut core::ffi::c_void,
+    pub Reserved6: *mut c_void,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Default, Debug)]
+pub struct IMAGE_RUNTIME_FUNCTION {
+    pub BeginAddress: u32,
+    pub EndAddress: u32,
+    pub UnwindData: u32
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct IMAGE_SECTION_HEADER {
+    pub Name: [u8; 8],
+    pub Misc: IMAGE_SECTION_HEADER_0,
+    pub VirtualAddress: u32,
+    pub SizeOfRawData: u32,
+    pub PointerToRawData: u32,
+    pub PointerToRelocations: u32,
+    pub PointerToLinenumbers: u32,
+    pub NumberOfRelocations: u16,
+    pub NumberOfLinenumbers: u16,
+    pub Characteristics: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union IMAGE_SECTION_HEADER_0 {
+    pub PhysicalAddress: u32,
+    pub VirtualSize: u32,
 }
