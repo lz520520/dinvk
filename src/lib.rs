@@ -18,7 +18,6 @@ mod macros;
 mod module;
 mod syscall;
 mod utils;
-mod str;
 
 /// Structures and types used across the library.
 pub mod data;
@@ -47,4 +46,3 @@ pub use functions::*;
 pub use module::*;
 pub use module::ldr::*;
 pub use utils::*;
-pub use str::*;

@@ -1,15 +1,9 @@
 use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
 use crate::{
-    dinvoke, get_ntdll_address, CStr,
-    GetModuleHandle, GetProcAddress,
-    data::{
-        NtCreateEvent, RtlQueueWorkItem, 
-        EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS,
-        WT_EXECUTEONLYONCE, WT_EXECUTEINWAITTHREAD,
-        WT_EXECUTEINTIMERTHREAD, RtlCreateTimerQueue, 
-        RtlCreateTimer, NT_SUCCESS, RtlRegisterWait 
-    }, 
+    cstr, data::{
+        NtCreateEvent, RtlCreateTimer, RtlCreateTimerQueue, RtlQueueWorkItem, RtlRegisterWait, EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS, NT_SUCCESS, WT_EXECUTEINTIMERTHREAD, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE 
+    }, dinvoke, get_ntdll_address, GetModuleHandle, GetProcAddress 
 };
 
 /// A helper struct to interact with dynamic module loading with Windows APIs via Proxy.
@@ -48,13 +42,12 @@ impl<'a> LdrProxy<'a> {
         let ntdll = get_ntdll_address();
         let kernel32 = GetModuleHandle(s!("KERNEL32.DLL"), None);
         let load_library = GetProcAddress(kernel32, s!("LoadLibraryA"), None);
-        let module_name = self.module.to_vec();
         Some(dinvoke!(
             ntdll,
             s!("RtlQueueWorkItem"),
             RtlQueueWorkItem,
             core::mem::transmute(load_library),
-            module_name.as_ptr() as *mut c_void,
+            cstr!(self.module) as *mut c_void,
             0x00000000
         )?)
     }
@@ -82,7 +75,6 @@ impl<'a> LdrProxy<'a> {
 
         // Create a timer and associate it with the module loading function
         let mut h_timer = null_mut();
-        let module_name = self.module.to_vec();
         Some(dinvoke!(
             ntdll,
             s!("RtlCreateTimer"),
@@ -90,7 +82,7 @@ impl<'a> LdrProxy<'a> {
             queue,
             &mut h_timer,
             core::mem::transmute(load_library),
-            module_name.as_ptr() as *mut c_void,
+            cstr!(self.module) as *mut c_void,
             0,
             0,
             WT_EXECUTEINTIMERTHREAD
@@ -118,7 +110,6 @@ impl<'a> LdrProxy<'a> {
 
         // Register a wait event associated with the module loading function
         let mut h_timer = null_mut();
-        let module_name = self.module.to_vec();
         Some(dinvoke!(
             ntdll,
             s!("RtlRegisterWait"),
@@ -126,7 +117,7 @@ impl<'a> LdrProxy<'a> {
             &mut h_timer,
             h_event,
             load_library,
-            module_name.as_ptr() as *mut c_void,
+            cstr!(self.module) as *mut c_void,
             0,
             WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD
         )?)
