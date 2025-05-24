@@ -473,16 +473,6 @@ pub fn get_syscall_address(address: *mut c_void) -> Option<u32> {
 ///
 /// * `true` - If the process is running under **WOW64**.
 /// * `false` - If the process is running in **pure x86 mode**.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// if is_wow64() {
-///     println!("Running under WOW64!");
-/// } else {
-///     println!("Running in pure x86 mode!");
-/// }
-/// ```
 /// 
 /// # Reference
 /// 

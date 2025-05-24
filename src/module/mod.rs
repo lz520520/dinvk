@@ -21,39 +21,6 @@ pub mod ldr;
 /// Stores the NTDLL address
 static NTDLL: spin::Once<u64> = spin::Once::new();
 
-/// Represents a module reference by name or hash.
-///
-/// Used as a generic input type to resolve loaded modules and their exports.
-pub enum Module<'a> {
-    /// Module specified by name.
-    Name(&'a str),
-
-    /// Module specified by 32-bit hash.
-    Hash(u32),
-}
-
-impl Module<'_> {
-    /// Returns `true` if the module reference is empty.
-    pub fn is_empty(&self) -> bool {
-        match self {
-            Module::Name(s) => s.is_empty(),
-            Module::Hash(_) => false,
-        }
-    }
-}
-
-impl<'a> From<&'a str> for Module<'a> {
-    fn from(s: &'a str) -> Self {
-        Module::Name(s)
-    }
-}
-
-impl From<u32> for Module<'_> {
-    fn from(h: u32) -> Self {
-        Module::Hash(h)
-    }
-}
-
 /// Resolves the base address of a module loaded in memory by name or hash.
 ///
 /// # Arguments
@@ -74,7 +41,7 @@ impl From<u32> for Module<'_> {
 /// let base = GetModuleHandle(2788516083u32, Some(murmur3));
 /// ```
 pub fn GetModuleHandle<'a>(
-    module: impl Into<Module<'a>>,
+    module: impl Into<Symbol<'a>>,
     hash: Option<fn(&str) -> u32>,
 ) -> HMODULE {
     let module = module.into();
@@ -99,9 +66,11 @@ pub fn GetModuleHandle<'a>(
                     ((*data_table_entry).FullDllName.Length / 2) as usize,
                 );
 
-                // Try interpreting `module` as a numeric hash (u32)
+                // We're handling string interpretations this way to avoid heap allocations, 
+                // which could potentially trigger a loop in the allocator under certain conditions.
                 match &module {
-                    Module::Hash(dll_hash) => {
+                    Symbol::Hash(dll_hash) => {
+                        // Try interpreting `module` as a numeric hash (u32)
                         let mut buf = [0u8; 256];
                         let n = upper(buffer, &mut buf);
                         let name = core::str::from_utf8(&buf[..n]).unwrap_or("");
@@ -109,7 +78,7 @@ pub fn GetModuleHandle<'a>(
                             return (*data_table_entry).Reserved2[0];
                         }
                     },
-                    Module::Name(name) => {
+                    Symbol::Name(name) => {
                         // If it is not an `u32`, it is treated as a string
                         let dll_file_name = canon(buffer);
                         let mut tmp = [0u16; 256];
@@ -120,7 +89,8 @@ pub fn GetModuleHandle<'a>(
                                 tmp[i] = c;
                                 i
                             })
-                            .last().unwrap_or(0) + 1;
+                            .last()
+                            .unwrap_or(0) + 1;
 
                         let canon_name = canon(&tmp[..len]);
                         if eq_nocase(canon_name, dll_file_name) {
@@ -175,7 +145,7 @@ pub fn GetModuleHandle<'a>(
 /// ```
 pub fn GetProcAddress<'a>(
     h_module: HMODULE, 
-    function: impl Into<Module<'a>>, 
+    function: impl Into<Symbol<'a>>, 
     hash: Option<fn(&str) -> u32>
 ) -> *mut c_void {
     if h_module.is_null() {
@@ -183,9 +153,8 @@ pub fn GetProcAddress<'a>(
     }
 
     let function = function.into();
-
+    let h_module = h_module as usize;
     unsafe {
-        let h_module = h_module as usize;
         let nt_header = (h_module + (*(h_module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) as *const IMAGE_NT_HEADERS;
         if (*nt_header).Signature != IMAGE_NT_SIGNATURE {
             return null_mut();
@@ -218,15 +187,13 @@ pub fn GetProcAddress<'a>(
 
         // Import By Ordinal
         let hash = hash.unwrap_or(crc32ba);
-        if let Module::Hash(ordinal) = &function {
+        if let Symbol::Hash(ordinal) = &function {
             if *ordinal <= 0xFFFF {
                 let ordinal = ordinal & 0xFFFF;
                 if ordinal >= (*export_dir).Base
                     && ordinal < (*export_dir).Base + (*export_dir).NumberOfFunctions
                 {
-                    let addr = (h_module
-                        + functions[ordinal as usize - (*export_dir).Base as usize] as usize)
-                        as *mut c_void;
+                    let addr = (h_module + functions[ordinal as usize - (*export_dir).Base as usize] as usize) as *mut c_void;
                     return get_forwarded_address(addr, export_dir, export_size, hash);
                 }
             }
@@ -236,17 +203,16 @@ pub fn GetProcAddress<'a>(
         for i in 0..(*export_dir).NumberOfNames as usize {
             let offset = (h_module + names[i] as usize) as *const i8;
             let name = CStr::from_ptr(offset).to_str().unwrap_or("");
-
             let ordinal = ordinals[i] as usize;
             let addr = (h_module + functions[ordinal] as usize) as *mut c_void;
 
             match &function {
-                Module::Hash(h) => {
+                Symbol::Hash(h) => {
                     if hash(name) == *h {
                         return get_forwarded_address(addr, export_dir, export_size, hash);
                     }
                 }
-                Module::Name(s) => {
+                Symbol::Name(s) => {
                     if name.eq_ignore_ascii_case(s) {
                         return get_forwarded_address(addr, export_dir, export_size, hash);
                     }
@@ -259,13 +225,6 @@ pub fn GetProcAddress<'a>(
 }
 
 /// Retrieves the base address of the `ntdll.dll` module.
-///
-/// This function accesses the Process Environment Block (PEB) and traverses
-/// the loader data structures to locate the base address of `ntdll.dll`.
-/// 
-/// # Returns
-///
-/// * A pointer to the base address of the `ntdll.dll` module.
 #[inline(always)]
 pub fn get_ntdll_address() -> *mut c_void {
     *NTDLL.call_once(|| GetModuleHandle(2788516083u32, Some(crate::hash::murmur3)) as u64) as *mut c_void
@@ -408,4 +367,37 @@ pub unsafe fn __readx18(offset: u64) -> u64 {
     }
 
     out + offset
+}
+
+/// Represents a symbol reference by name or hash.
+///
+/// Used as a generic input type to resolve loaded symbol and their exports.
+pub enum Symbol<'a> {
+    /// Module specified by name.
+    Name(&'a str),
+
+    /// Module specified by 32-bit hash.
+    Hash(u32),
+}
+
+impl Symbol<'_> {
+    /// Returns `true` if the module reference is empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Symbol::Name(s) => s.is_empty(),
+            Symbol::Hash(_) => false,
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Symbol<'a> {
+    fn from(s: &'a str) -> Self {
+        Symbol::Name(s)
+    }
+}
+
+impl From<u32> for Symbol<'_> {
+    fn from(h: u32) -> Self {
+        Symbol::Hash(h)
+    }
 }

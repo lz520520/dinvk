@@ -8,9 +8,6 @@ use crate::{
 
 /// `ConsoleWriter` is a custom implementation of `core::fmt::Write`
 /// that writes formatted strings directly to the Windows console.
-///
-/// This is particularly useful in `#[no_std]` environments where
-/// standard printing functions are unavailable.
 pub struct ConsoleWriter;
 
 impl Write for ConsoleWriter {
