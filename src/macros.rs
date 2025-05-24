@@ -120,26 +120,3 @@ macro_rules! dprintln {
         let _ = writeln!(console, $($arg)*);
     }};
 }
-
-/// Converts a Rust `&str` into a null-terminated C-style string pointer (`*const u8`) at compile time..
-///
-/// # Arguments
-///
-/// * `$s` - A string slice (`&str`) to convert.
-///
-/// # Returns
-///
-/// * `*const u8` — A raw pointer to a null-terminated buffer.
-#[macro_export]
-macro_rules! cstr {
-    ($s:expr) => {{
-        let src = $s.as_bytes();
-        let mut buf = [0u8; 500];
-
-        let len = core::cmp::min(src.len(), buf.len() - 1);
-        buf[..len].copy_from_slice(&src[..len]);
-        buf[len] = 0;
-
-        buf.as_ptr()
-    }};
-}

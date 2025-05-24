@@ -2,7 +2,7 @@ use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
 use crate::{
     data::*, dinvoke, get_ntdll_address, 
-    GetModuleHandle, NtCurrentTeb, cstr
+    GetModuleHandle, NtCurrentTeb,
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -14,13 +14,16 @@ use crate::breakpoint::{
 
 /// Wrapper for the `LoadLibraryA` function from `KERNEL32.DLL`.
 pub fn LoadLibraryA(module: &str) -> *mut c_void {
-    let name = cstr!(module);
+    let mut module_bytes = module.as_bytes().to_vec();
+    module_bytes.push(0);
+
+    let name = unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(&module_bytes) };
     let kernel32 = GetModuleHandle(s!("KERNEL32.DLL"), None);
     dinvoke!(
         kernel32,
         s!("LoadLibraryA"),
         LoadLibraryA,
-        name
+        name.as_ptr().cast()
     )
     .unwrap_or(null_mut())
 }
