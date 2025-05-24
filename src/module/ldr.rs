@@ -1,9 +1,9 @@
 use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
 use crate::{
-    cstr, data::{
-        NtCreateEvent, RtlCreateTimer, RtlCreateTimerQueue, RtlQueueWorkItem, RtlRegisterWait, EVENT_ALL_ACCESS, EVENT_TYPE, NTSTATUS, NT_SUCCESS, WT_EXECUTEINTIMERTHREAD, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE 
-    }, dinvoke, get_ntdll_address, GetModuleHandle, GetProcAddress 
+    cstr, data::*, 
+    dinvoke, get_ntdll_address, 
+    GetModuleHandle, GetProcAddress 
 };
 
 /// A helper struct to interact with dynamic module loading with Windows APIs via Proxy.
