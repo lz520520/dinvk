@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 #![doc = include_str!("../README.md")]
 #![allow(non_snake_case, non_camel_case_types)]
 #![allow(
