@@ -17,6 +17,34 @@ use super::{
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct API_SET_HASH_ENTRY {
+	Hash: u32,
+	Index: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct API_SET_NAMESPACE_ENTRY {
+	pub Flags: u32,
+	pub NameOffset: u32,
+	pub NameLength: u32,
+	pub HashedLength: u32,
+	pub ValueOffset: u32,
+	pub ValueCount: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct API_SET_VALUE_ENTRY {
+	pub Flags: u32,
+	pub NameOffset: u32,
+	pub NameLength: u32,
+	pub ValueOffset: u32,
+	pub ValueLength: u32
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub struct IMAGE_NT_HEADERS {
     pub Signature: u32,

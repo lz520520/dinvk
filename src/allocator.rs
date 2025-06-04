@@ -1,8 +1,4 @@
-use obfstr::obfstr as s;
-use crate::{
-    data::*, dinvoke, 
-    get_ntdll_address
-};
+use crate::{data::*, link};
 use core::{
     ptr::null_mut, ffi::c_void,
     alloc::{GlobalAlloc, Layout},
@@ -14,6 +10,8 @@ pub struct WinHeap {
     // Store the HANDLE as a usize for atomic operations
     heap: AtomicUsize,
 }
+/// Allows `WinHeap` to be safely shared across threads.
+unsafe impl Sync for WinHeap {}
 
 impl WinHeap {
     /// Creates a new, uninitialized `WinHeap` instance.
@@ -44,28 +42,20 @@ impl WinHeap {
         }
 
         // Double-checked locking to ensure only one thread initializes
-        let new_heap = dinvoke!(
-            get_ntdll_address(),
-            s!("RtlCreateHeap"),
-            RtlCreateHeap,
-            0,
-            null_mut(),
-            0,
-            0,
-            null_mut(),
-            null_mut()
-        )
-        .unwrap_or(null_mut());
+        let new_heap = unsafe {
+            RtlCreateHeap(
+                0,
+                null_mut(),
+                0,
+                0,
+                null_mut(),
+                null_mut()
+            )
+        };
 
         // Try to store the new heap; another thread might beat us to it
-        let old = self.heap
-            .compare_exchange(0, new_heap as usize, Ordering::Release, Ordering::Acquire);
-
-        if old.is_ok() {
-            new_heap
-        } else {
-            self.heap.load(Ordering::Acquire) as HANDLE
-        }
+        let old = self.heap.compare_exchange(0, new_heap as usize, Ordering::Release, Ordering::Acquire);
+        self.heap.load(Ordering::Acquire) as HANDLE
     }
 }
 
@@ -87,15 +77,13 @@ unsafe impl GlobalAlloc for WinHeap {
         }
 
         // Another thread initialized the heap, free our local one
-        dinvoke!(
-            get_ntdll_address(),
-            s!("RtlAllocateHeap"),
-            RtlAllocateHeap,
-            heap,
-            0,
-            layout.size()
-        )
-        .unwrap_or(null_mut()) as *mut u8
+        unsafe {
+            RtlAllocateHeap(
+                heap,
+                0,
+                size
+            ) as *mut u8
+        }
     }
 
     /// Deallocates memory using the custom heap.
@@ -113,34 +101,11 @@ unsafe impl GlobalAlloc for WinHeap {
             return;
         }
         
-        dinvoke!(
-            get_ntdll_address(),
-            s!("RtlFreeHeap"),
-            RtlFreeHeap,
-            self.heap(),
-            0,
-            ptr as *mut c_void
-        );
+        unsafe { RtlFreeHeap(self.heap(), 0, ptr as *mut c_void); }
     }
 }
 
-/// Allows `WinHeap` to be safely shared across threads.
-unsafe impl Sync for WinHeap {}
-
-impl Drop for WinHeap {
-    /// Cleans up the heap on drop.
-    ///
-    /// If the heap was initialized, it will be destroyed, releasing all
-    /// associated memory. This ensures proper resource cleanup.
-    fn drop(&mut self) {
-        let heap = self.heap.load(Ordering::Acquire);
-        if heap != 0 {
-            let _ = dinvoke!(
-                get_ntdll_address(),
-                s!("RtlDestroyHeap"),
-                RtlDestroyHeap,
-                heap as *mut c_void
-            );
-        }
-    }
-}
+link!("ntdll.dll" "system" fn RtlDestroyHeap(heap: *mut c_void) -> *mut c_void);
+link!("ntdll.dll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
+link!("ntdll.dll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
+link!("ntdll.dll" "system" fn RtlCreateHeap(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE);

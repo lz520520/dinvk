@@ -1,18 +1,12 @@
+use alloc::string::{String, ToString};
 use core::{
     ffi::{c_void, CStr}, 
     ptr::null_mut, 
     slice::from_raw_parts
 };
 use crate::{
-    functions::LoadLibraryA, 
-    hash::crc32ba,
-    utils::*,
-    data::{
-        HMODULE, IMAGE_DIRECTORY_ENTRY_EXPORT, 
-        IMAGE_DOS_HEADER, IMAGE_EXPORT_DIRECTORY, 
-        IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE, 
-        LDR_DATA_TABLE_ENTRY, PEB, TEB 
-    },  
+    data::*, functions::LoadLibraryA, 
+    hash::crc32ba, parse::Pe, utils::*
 };
 
 /// Module containing dynamic module loader proxy.
@@ -40,11 +34,10 @@ static NTDLL: spin::Once<u64> = spin::Once::new();
 /// let base = GetModuleHandle("ntdll.dll", None);
 /// let base = GetModuleHandle(2788516083u32, Some(murmur3));
 /// ```
-pub fn GetModuleHandle<'a>(
-    module: impl Into<Symbol<'a>>,
-    hash: Option<fn(&str) -> u32>,
-) -> HMODULE {
-    let module = module.into();
+pub fn GetModuleHandle<T>(module: T, hash: Option<fn(&str) -> u32>) -> HMODULE
+where 
+    T: ToString
+{
     unsafe {
         let hash = hash.unwrap_or(crc32ba);
         let peb = NtCurrentPeb();
@@ -52,50 +45,35 @@ pub fn GetModuleHandle<'a>(
         let mut data_table_entry = (*ldr_data).InMemoryOrderModuleList.Flink as *const LDR_DATA_TABLE_ENTRY;
         let mut list_node = (*ldr_data).InMemoryOrderModuleList.Flink;
 
-        if module.is_empty() {
+        if module.to_string().is_empty() {
             return (*peb).ImageBaseAddress;
         }
 
         // Save a reference to the head nod for the list
         let head_node = list_node;
+        let mut addr = null_mut();
         while !(*data_table_entry).FullDllName.Buffer.is_null() {
             if (*data_table_entry).FullDllName.Length != 0 {
                 // Converts the buffer from UTF-16 to a `String`
                 let buffer = from_raw_parts(
                     (*data_table_entry).FullDllName.Buffer,
-                    ((*data_table_entry).FullDllName.Length / 2) as usize,
+                    ((*data_table_entry).FullDllName.Length / 2) as usize
                 );
-
-                // We're handling string interpretations this way to avoid heap allocations, 
-                // which could potentially trigger a loop in the allocator under certain conditions.
-                match &module {
-                    Symbol::Hash(dll_hash) => {
-                        // Try interpreting `module` as a numeric hash (u32)
-                        let mut buf = [0u8; 256];
-                        let n = upper(buffer, &mut buf);
-                        let name = core::str::from_utf8(&buf[..n]).unwrap_or("");
-                        if *dll_hash == hash(name) {
-                            return (*data_table_entry).Reserved2[0];
-                        }
-                    },
-                    Symbol::Name(name) => {
-                        // If it is not an `u32`, it is treated as a string
-                        let dll_file_name = canon(buffer);
-                        let mut tmp = [0u16; 256];
-                        let len = name.encode_utf16()
-                            .take(256)
-                            .enumerate()
-                            .map(|(i, c)| {
-                                tmp[i] = c;
-                                i
-                            })
-                            .last()
-                            .unwrap_or(0) + 1;
-
-                        let canon_name = canon(&tmp[..len]);
-                        if eq_nocase(canon_name, dll_file_name) {
-                            return (*data_table_entry).Reserved2[0];
-                        }
+            
+                // Try interpreting `module` as a numeric hash (u32)
+                let mut dll_file_name = String::from_utf16_lossy(buffer).to_uppercase();
+                if let Ok(dll_hash) = module.to_string().parse::<u32>() {
+                    if dll_hash == hash(&dll_file_name) {
+                        addr = (*data_table_entry).Reserved2[0];
+                        break;
+                    }
+                } else {
+                    // If it is not an `u32`, it is treated as a string
+                    let module = canonicalize_module(&module.to_string());
+                    dll_file_name = canonicalize_module(&dll_file_name);
+                    if dll_file_name == module {
+                        addr = (*data_table_entry).Reserved2[0];
+                        break;
                     }
                 }
             }
@@ -105,25 +83,25 @@ pub fn GetModuleHandle<'a>(
 
             // Break out of loop if all of the nodes have been checked
             if list_node == head_node {
-                break;
+                break
             }
 
             data_table_entry = list_node as *const LDR_DATA_TABLE_ENTRY
         }
+        
+        addr
     }
-
-    null_mut()
 }
 
-/// Retrieves the address of a function exported by a given module.
+/// Retrieves the address of an exported function from a loaded module.
 ///
 /// Supports lookup by name (`&str`), hash (`u32`), or ordinal (`u16`).
 ///
 /// # Arguments
 ///
-/// * `h_module` - Handle of the module (base address)
-/// * `function` - Can be a name, hash or ordinal
-/// * `hash` - Optional function to hash export names for hash-based matching
+/// * `h_module` - Handle to the loaded module (base address)
+/// * `function` - Name, hash, or ordinal as input
+/// * `hash` - Optional hash function (e.g., CRC32, Murmur3)
 ///
 /// # Returns
 ///
@@ -141,29 +119,29 @@ pub fn GetModuleHandle<'a>(
 /// ```
 ///
 /// ```rust,ignore
-/// let func = GetProcAddress(base, 473u32, None);
+/// let func = GetProcAddress(base, 473u32, None); // ordinal
 /// ```
-pub fn GetProcAddress<'a>(
-    h_module: HMODULE, 
-    function: impl Into<Symbol<'a>>, 
-    hash: Option<fn(&str) -> u32>
-) -> *mut c_void {
+pub fn GetProcAddress<T>(h_module: HMODULE, function: T, hash: Option<fn(&str) -> u32>) -> *mut c_void
+where 
+    T: ToString,
+{
     if h_module.is_null() {
         return null_mut();
     }
 
-    let function = function.into();
-    let h_module = h_module as usize;
     unsafe {
-        let nt_header = (h_module + (*(h_module as *const IMAGE_DOS_HEADER)).e_lfanew as usize) as *const IMAGE_NT_HEADERS;
-        if (*nt_header).Signature != IMAGE_NT_SIGNATURE {
-            return null_mut();
-        }
+        // Converts the module handle to a base address (usize)
+        let h_module = h_module as usize;
 
-        // Retrieves the export table
-        let export_dir = (h_module + (*nt_header).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT as usize].VirtualAddress as usize) 
-            as *const IMAGE_EXPORT_DIRECTORY;
-        
+        // Initializes the PE parser from the base address
+        let pe = Pe::new(h_module as *mut c_void);
+
+        // Retrieves the NT header and export directory; returns null if either is missing
+        let (nt_header, export_dir) = match (pe.nt_header(), pe.exports().directory()) {
+            (Some(nt), Some(export)) => (nt, export),
+            _ => return null_mut(),
+        };
+
         // Retrieves the size of the export table
         let export_size = (*nt_header).OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT as usize].Size as usize;
 
@@ -185,37 +163,45 @@ pub fn GetProcAddress<'a>(
             (*export_dir).NumberOfNames as usize
         );
 
+        // Convert Api name to String
+        let api_name = function.to_string();
+
         // Import By Ordinal
-        let hash = hash.unwrap_or(crc32ba);
-        if let Symbol::Hash(ordinal) = &function {
-            if *ordinal <= 0xFFFF {
+        if let Ok(ordinal) = api_name.parse::<u32>() {
+            if ordinal <= 0xFFFF {
                 let ordinal = ordinal & 0xFFFF;
-                if ordinal >= (*export_dir).Base
-                    && ordinal < (*export_dir).Base + (*export_dir).NumberOfFunctions
-                {
-                    let addr = (h_module + functions[ordinal as usize - (*export_dir).Base as usize] as usize) as *mut c_void;
-                    return get_forwarded_address(addr, export_dir, export_size, hash);
+                if ordinal < (*export_dir).Base || (ordinal >= (*export_dir).Base + (*export_dir).NumberOfFunctions) {
+                    return null_mut();
                 }
+
+                return core::mem::transmute(h_module + functions[ordinal as usize - (*export_dir).Base as usize] as usize);
             }
         }
 
-        // Import By Name or Hash
-        for i in 0..(*export_dir).NumberOfNames as usize {
-            let offset = (h_module + names[i] as usize) as *const i8;
-            let name = CStr::from_ptr(offset).to_str().unwrap_or("");
-            let ordinal = ordinals[i] as usize;
-            let addr = (h_module + functions[ordinal] as usize) as *mut c_void;
+        // Extract DLL name from export directory for forwarder resolution
+        let dll_name = {
+            let ptr = (h_module + (*export_dir).Name as usize) as *const i8;
+            CStr::from_ptr(ptr).to_string_lossy().into_owned()
+        };
 
-            match &function {
-                Symbol::Hash(h) => {
-                    if hash(name) == *h {
-                        return get_forwarded_address(addr, export_dir, export_size, hash);
-                    }
+        // Import By Name or Hash
+        let hash = hash.unwrap_or(crc32ba);
+        for i in 0..(*export_dir).NumberOfNames as usize {
+            let name = CStr::from_ptr((h_module + names[i] as usize) as *const i8)
+                .to_str()
+                .unwrap_or("");
+
+            let ordinal = ordinals[i] as usize;
+            let address = (h_module + functions[ordinal] as usize) as *mut c_void;
+            if let Ok(api_hash) = api_name.parse::<u32>() {
+                // Comparison by hash
+                if hash(name) == api_hash {
+                    return get_forwarded_address(&dll_name, address, export_dir, export_size, hash);
                 }
-                Symbol::Name(s) => {
-                    if name.eq_ignore_ascii_case(s) {
-                        return get_forwarded_address(addr, export_dir, export_size, hash);
-                    }
+            } else {
+                // Comparison by String
+                if name == api_name {
+                    return get_forwarded_address(&dll_name, address, export_dir, export_size, hash);
                 }
             }
         }
@@ -224,42 +210,140 @@ pub fn GetProcAddress<'a>(
     null_mut()
 }
 
-/// Retrieves the base address of the `ntdll.dll` module.
-#[inline(always)]
-pub fn get_ntdll_address() -> *mut c_void {
-    *NTDLL.call_once(|| GetModuleHandle(2788516083u32, Some(crate::hash::murmur3)) as u64) as *mut c_void
-}
-
-/// Resolves a forwarded export address from a module's export table.
+/// Resolves forwarded exports (e.g., `KERNEL32.SomeFunc`, or `api-ms-*`) to the actual implementation address.
 ///
 /// # Arguments
 /// 
-/// * `address` - The address to check, typically obtained from the export table.
-/// * `export_dir` - A pointer to the `IMAGE_EXPORT_DIRECTORY` of the module.
-/// * `export_size` - The size of the export directory.
-/// * `hash` - A function to hash strings, used to resolve forwarded functions by name.
+/// * `module` - Name of the current module performing the resolution
+/// * `address` - Address returned from the export table
+/// * `export_dir` - Pointer to the module's IMAGE_EXPORT_DIRECTORY
+/// * `export_size` - Size of the export directory
+/// * `hash` - Function to hash names (used for recursive resolution)
 ///
 /// # Returns
 /// 
-/// * A pointer (`*mut c_void`) to the resolved function, either from the forwarded module or the original address.
-unsafe fn get_forwarded_address(
+/// * Resolved address or original address if not a forwarder.
+fn get_forwarded_address(
+    module: &str,
     address: *mut c_void,
     export_dir: *const IMAGE_EXPORT_DIRECTORY,
     export_size: usize,
     hash: fn(&str) -> u32,
-) -> *mut c_void  {
-    // Checks forwarder functions
-    if address as usize >= export_dir as usize && (address as usize) < (export_dir as usize + export_size) {
+) -> *mut c_void {
+    // Detect if the address is a forwarder RVA
+    if (address as usize) >= export_dir as usize &&
+       (address as usize) < (export_dir as usize + export_size)
+    {
         let cstr = unsafe { CStr::from_ptr(address as *const i8) };
-        let forwarder_name = cstr.to_str().unwrap_or("");
+        let forwarder = cstr.to_str().unwrap_or_default();
+        let (module_name, function_name) = forwarder.split_once('.').unwrap_or(("", ""));
 
-        let mut parts = forwarder_name.splitn(2, '.');
-        let module_name = parts.next().unwrap_or("");
-        let function_name = parts.next().unwrap_or("");
-        return GetProcAddress(LoadLibraryA(module_name), hash(function_name), Some(hash));
+        // If forwarder is of type api-ms-* or ext-ms-*
+        let module_resolved = if module_name.starts_with("api-ms") || module_name.starts_with("ext-ms") {
+            let base_contract = module_name.rsplit_once('-').map(|(b, _)| b).unwrap_or(module_name);
+            resolve_api_set_map(module, base_contract)
+        } else {
+            Some(vec![format!("{}.dll", module_name)])
+        };
+
+        // Try resolving the symbol from all resolved modules
+        if let Some(modules) = module_resolved {
+            for module in modules {
+                let mut addr = GetModuleHandle(module.as_str(), None);
+                if addr.is_null() {
+                    addr = LoadLibraryA(module.as_str());
+                }
+
+                if !addr.is_null() {
+                    let resolved = GetProcAddress(addr, hash(function_name), Some(hash));
+                    if !resolved.is_null() {
+                        return resolved;
+                    }
+                }
+            }
+        }
     }
 
     address
+}
+
+/// Resolves ApiSet contracts (e.g., `api-ms-win-core-*`) to the actual implementing DLLs.
+///
+/// This parses the ApiSetMap from the PEB and returns all possible DLLs,
+/// excluding the current module itself if `ValueCount > 1`.
+///
+/// # Arguments
+/// 
+/// * `host_name` - Name of the module currently resolving (to avoid loops)
+/// * `contract_name` - Base contract name (e.g., `api-ms-win-core-processthreads`)
+///
+/// # Returns
+/// 
+/// * A list of DLL names that implement the contract, or `None` if not found.
+pub fn resolve_api_set_map(host_name: &str, contract_name: &str) -> Option<Vec<String>> {
+    unsafe {
+        let peb = NtCurrentPeb();
+        let map = (*peb).ApiSetMap;
+        
+        // Base pointer for the namespace entry array
+        let ns_entry = ((*map).EntryOffset as usize + map as usize) as *const API_SET_NAMESPACE_ENTRY;
+        let ns_entries = from_raw_parts(ns_entry, (*map).Count as usize);
+
+        for entry in ns_entries {
+            let name = String::from_utf16_lossy(from_raw_parts(
+                (map as usize + entry.NameOffset as usize) as *const u16,
+                entry.NameLength as usize / 2,
+            ));
+
+            if name.starts_with(contract_name) {
+                let values = from_raw_parts(
+                    (map as usize + entry.ValueOffset as usize) as *const API_SET_VALUE_ENTRY, 
+                    entry.ValueCount as usize
+                );
+
+                // Only one value: direct forward
+                if values.len() == 1 {
+                    let val = &values[0];
+                    let dll = String::from_utf16_lossy(from_raw_parts(
+                        (map as usize + val.ValueOffset as usize) as *const u16,
+                        val.ValueLength as usize / 2,
+                    ));
+
+                    return Some(vec![dll]);
+                }
+                
+                // Multiple values: skip the host DLL to avoid self-resolving
+                let mut result = Vec::new();
+                for val in values {
+                    let name = String::from_utf16_lossy(from_raw_parts(
+                        (map as usize + val.ValueOffset as usize) as *const u16,
+                        val.ValueLength as usize / 2,
+                    ));
+
+                    if !name.eq_ignore_ascii_case(&host_name) {
+                        let dll = String::from_utf16_lossy(from_raw_parts(
+                            (map as usize + val.ValueOffset as usize) as *const u16,
+                            val.ValueLength as usize / 2,
+                        ));
+   
+                        result.push(dll);
+                    }
+                }
+                
+                if !result.is_empty() {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Retrieves the base address of the `ntdll.dll` module.
+#[inline(always)]
+pub fn get_ntdll_address() -> *mut c_void {
+    *NTDLL.call_once(|| GetModuleHandle(2788516083u32, Some(crate::hash::murmur3)) as u64) as *mut c_void
 }
 
 /// Retrieves a pointer to the Process Environment Block (PEB) of the current process.
@@ -367,37 +451,4 @@ pub unsafe fn __readx18(offset: u64) -> u64 {
     }
 
     out + offset
-}
-
-/// Represents a symbol reference by name or hash.
-///
-/// Used as a generic input type to resolve loaded symbol and their exports.
-pub enum Symbol<'a> {
-    /// Module specified by name.
-    Name(&'a str),
-
-    /// Module specified by 32-bit hash.
-    Hash(u32),
-}
-
-impl Symbol<'_> {
-    /// Returns `true` if the module reference is empty.
-    pub fn is_empty(&self) -> bool {
-        match self {
-            Symbol::Name(s) => s.is_empty(),
-            Symbol::Hash(_) => false,
-        }
-    }
-}
-
-impl<'a> From<&'a str> for Symbol<'a> {
-    fn from(s: &'a str) -> Self {
-        Symbol::Name(s)
-    }
-}
-
-impl From<u32> for Symbol<'_> {
-    fn from(h: u32) -> Self {
-        Symbol::Hash(h)
-    }
 }

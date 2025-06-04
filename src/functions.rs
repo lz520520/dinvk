@@ -14,10 +14,7 @@ use crate::breakpoint::{
 
 /// Wrapper for the `LoadLibraryA` function from `KERNEL32.DLL`.
 pub fn LoadLibraryA(module: &str) -> *mut c_void {
-    let mut module_bytes = module.as_bytes().to_vec();
-    module_bytes.push(0);
-
-    let name = unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(&module_bytes) };
+    let name = alloc::format!("{module}\0");
     let kernel32 = GetModuleHandle(s!("KERNEL32.DLL"), None);
     dinvoke!(
         kernel32,
