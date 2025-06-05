@@ -1,6 +1,6 @@
 [package]
 name = "dinvk"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 description = "Dynamically invoke arbitrary code and use various tricks written idiomatically in Rust (Dinvoke)"
 license = "MIT"
