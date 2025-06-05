@@ -10,6 +10,7 @@ pub struct WinHeap {
     // Store the HANDLE as a usize for atomic operations
     heap: AtomicUsize,
 }
+
 /// Allows `WinHeap` to be safely shared across threads.
 unsafe impl Sync for WinHeap {}
 
@@ -54,7 +55,7 @@ impl WinHeap {
         };
 
         // Try to store the new heap; another thread might beat us to it
-        let old = self.heap.compare_exchange(0, new_heap as usize, Ordering::Release, Ordering::Acquire);
+        _ = self.heap.compare_exchange(0, new_heap as usize, Ordering::Release, Ordering::Acquire);
         self.heap.load(Ordering::Acquire) as HANDLE
     }
 }
@@ -91,21 +92,21 @@ unsafe impl GlobalAlloc for WinHeap {
     /// # Arguments
     ///
     /// * `ptr` - A pointer to the memory to deallocate.
-    /// * `_` - The memory layout (ignored during deallocation).
+    /// * `layout` - The memory layout.
     /// 
     /// # Notes
     /// 
     /// * If `ptr` is null, this function does nothing.
-    unsafe fn dealloc(&self, ptr: *mut u8, _: Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if ptr.is_null() {
             return;
         }
-        
-        unsafe { RtlFreeHeap(self.heap(), 0, ptr as *mut c_void); }
+    
+        unsafe { core::ptr::write_bytes(ptr, 0, layout.size()) };
+        unsafe { RtlFreeHeap(self.heap(), 0, ptr.cast()); }
     }
 }
 
-link!("ntdll.dll" "system" fn RtlDestroyHeap(heap: *mut c_void) -> *mut c_void);
 link!("ntdll.dll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
 link!("ntdll.dll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
 link!("ntdll.dll" "system" fn RtlCreateHeap(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE);
