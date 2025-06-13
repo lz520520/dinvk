@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
 use crate::{
@@ -41,10 +42,13 @@ impl<'a> LdrProxy<'a> {
         let ntdll = get_ntdll_address();
         let kernel32 = GetModuleHandle(s!("KERNEL32.DLL"), None);
         let load_library = GetProcAddress(kernel32, s!("LoadLibraryA"), None);
-        let mut module_bytes = self.module.as_bytes().to_vec();
-        module_bytes.push(0);
-
-        let module = unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(&module_bytes) };
+        let module = self.module
+            .as_bytes()
+            .iter()
+            .copied()
+            .chain(core::iter::once(0))
+            .collect::<Vec<u8>>();
+        
         Some(dinvoke!(
             ntdll,
             s!("RtlQueueWorkItem"),
@@ -78,10 +82,13 @@ impl<'a> LdrProxy<'a> {
 
         // Create a timer and associate it with the module loading function
         let mut h_timer = null_mut();
-        let mut module_bytes = self.module.as_bytes().to_vec();
-        module_bytes.push(0);
+        let module = self.module
+            .as_bytes()
+            .iter()
+            .copied()
+            .chain(core::iter::once(0))
+            .collect::<Vec<u8>>();
 
-        let module = unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(&module_bytes) };
         Some(dinvoke!(
             ntdll,
             s!("RtlCreateTimer"),
@@ -117,10 +124,13 @@ impl<'a> LdrProxy<'a> {
 
         // Register a wait event associated with the module loading function
         let mut h_timer = null_mut();
-        let mut module_bytes = self.module.as_bytes().to_vec();
-        module_bytes.push(0);
+        let module = self.module
+            .as_bytes()
+            .iter()
+            .copied()
+            .chain(core::iter::once(0))
+            .collect::<Vec<u8>>();
 
-        let module = unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(&module_bytes) };
         Some(dinvoke!(
             ntdll,
             s!("RtlRegisterWait"),

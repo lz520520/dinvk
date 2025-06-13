@@ -1,3 +1,4 @@
+use obfstr::obfstr as s;
 use alloc::{
     format, vec::Vec, vec,
     string::{String, ToString}, 
@@ -9,7 +10,7 @@ use core::{
 };
 use crate::{
     data::*, functions::LoadLibraryA, 
-    hash::crc32ba, parse::Pe, utils::*
+    hash::crc32ba, parse::PE, utils::*
 };
 
 /// Module containing dynamic module loader proxy.
@@ -137,7 +138,7 @@ where
         let h_module = h_module as usize;
 
         // Initializes the PE parser from the base address
-        let pe = Pe::new(h_module as *mut c_void);
+        let pe = PE::parse(h_module as *mut c_void);
 
         // Retrieves the NT header and export directory; returns null if either is missing
         let (nt_header, export_dir) = match (pe.nt_header(), pe.exports().directory()) {
@@ -242,7 +243,7 @@ fn get_forwarded_address(
         let (module_name, function_name) = forwarder.split_once('.').unwrap_or(("", ""));
 
         // If forwarder is of type api-ms-* or ext-ms-*
-        let module_resolved = if module_name.starts_with("api-ms") || module_name.starts_with("ext-ms") {
+        let module_resolved = if module_name.starts_with(s!("api-ms")) || module_name.starts_with(s!("ext-ms")) {
             let base_contract = module_name.rsplit_once('-').map(|(b, _)| b).unwrap_or(module_name);
             resolve_api_set_map(module, base_contract)
         } else {

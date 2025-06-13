@@ -10,18 +10,18 @@ pub type Functions<'a> = BTreeMap<usize, &'a str>;
 
 /// Portable Executable (PE) abstraction over a module's in-memory image.
 #[derive(Debug)]
-pub struct Pe {
+pub struct PE {
     /// Base address of the loaded module.
     pub base: *mut c_void,
 }
 
-impl Pe {
+impl PE {
     /// Creates a new `Pe` instance from a module base.
     ///
     /// # Safety
     /// Caller must ensure `base` is a valid PE module.
     #[inline]
-    pub fn new(base: *mut c_void) -> Self {
+    pub fn parse(base: *mut c_void) -> Self {
         Self { base }
     }
 
@@ -32,6 +32,7 @@ impl Pe {
     }
 
     /// Returns a pointer to the `IMAGE_NT_HEADERS`, if valid.
+    #[inline]
     pub fn nt_header(&self) -> Option<*const IMAGE_NT_HEADERS> {
         unsafe {
             let dos = self.base as *const IMAGE_DOS_HEADER;
@@ -79,25 +80,25 @@ impl Pe {
 
     /// Exports helper
     #[inline]
-    pub fn exports(&self) -> PeExports<'_> {
-        PeExports { pe: self }
+    pub fn exports(&self) -> Exports<'_> {
+        Exports { pe: self }
     }
 
     /// Unwind helper
     #[inline]
-    pub fn unwind(&self) -> PeUnwind<'_> {
-        PeUnwind { pe: self }
+    pub fn unwind(&self) -> Unwind<'_> {
+        Unwind { pe: self }
     }
 }
 
 /// Provides access to the export table of a PE image.
 #[derive(Debug)]
-pub struct PeExports<'a> {
+pub struct Exports<'a> {
     /// Reference to the parsed PE image.
-    pub pe: &'a Pe,
+    pub pe: &'a PE,
 }
 
-impl<'a> PeExports<'a> {
+impl<'a> Exports<'a> {
     /// Returns a pointer to the `IMAGE_EXPORT_DIRECTORY`, if present.
     pub fn directory(&self) -> Option<*const IMAGE_EXPORT_DIRECTORY> {
         unsafe {
@@ -150,12 +151,12 @@ impl<'a> PeExports<'a> {
 
 /// Provides access to the unwind (exception handling) information of a PE image.
 #[derive(Debug)]
-pub struct PeUnwind<'a> {
+pub struct Unwind<'a> {
     /// Reference to the parsed PE image.
-    pub pe: &'a Pe,
+    pub pe: &'a PE,
 }
 
-impl<'a> PeUnwind<'a> {
+impl<'a> Unwind<'a> {
     /// Returns the address of the unwind/exception table.
     pub fn directory(&self) -> Option<*const IMAGE_RUNTIME_FUNCTION> {
         let nt = self.pe.nt_header()?;

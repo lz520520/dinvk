@@ -65,25 +65,24 @@ Allows resolving and calling a function dynamically at runtime, avoiding static 
 
 use dinvk::{
     data::HeapAlloc, 
-    dinvoke, 
-    GetModuleHandle
+    dinvoke, GetModuleHandle
+    NtCurrentPeb, GetProcessHeap
 };
 
 const HEAP_ZERO_MEMORY: u32 = 8u32;
 
 fn main() {
-    let peb = dinvk::NtCurrentPeb();
     let kernel32 = GetModuleHandle("KERNEL32.DLL", None);
     let addr = dinvoke!(
         kernel32,
         "HeapAlloc",
         HeapAlloc,
-        (*peb).ProcessHeap,
+        GetProcessHeap(),
         HEAP_ZERO_MEMORY,
         0x200
     );
     
-    println!("@ Address: {:?}", addr);
+    println!("[+] Address: {:?}", addr);
 }
 ```
 
@@ -120,7 +119,7 @@ Executes syscalls indirectly, bypassing user-mode API hooks and security monitor
 use std::{ffi::c_void, ptr::null_mut};
 use dinvk::{
     data::{HANDLE, NTSTATUS, NT_SUCCESS}, 
-    syscall
+    syscall, NtCurrentProcess
 };
 
 fn main() -> Result<(), NTSTATUS> {
@@ -129,7 +128,7 @@ fn main() -> Result<(), NTSTATUS> {
 
     let status = syscall!(
         "NtAllocateVirtualMemory",
-        -1isize as HANDLE,
+        NtCurrentProcess(),
         &mut addr,
         0,
         &mut size,
@@ -138,7 +137,7 @@ fn main() -> Result<(), NTSTATUS> {
     ).ok_or(-1)?;
 
     if !NT_SUCCESS(status) {
-        eprintln!("@ NtAllocateVirtualMemory Failed With Status: {:?}", status);
+        eprintln!("[-] NtAllocateVirtualMemory Failed With Status: {:?}", status);
         return Err(status)
     }
 
@@ -156,7 +155,7 @@ The code below demonstrates how to invoke `NtAllocateVirtualMemory` using differ
 use std::{ffi::c_void, ptr::null_mut};
 use dinvk::{
     data::{HANDLE, NTSTATUS, NT_SUCCESS}, 
-    syscall, Dll
+    syscall, Dll, NtCurrentProcess
 };
 
 fn main() -> Result<(), NTSTATUS> {
@@ -166,9 +165,9 @@ fn main() -> Result<(), NTSTATUS> {
     // Memory allocation using a syscall
     let mut addr = null_mut::<c_void>();
     let mut size = (1 << 12) as usize;
-    let status = syscall!("NtAllocateVirtualMemory", -1isize as HANDLE, &mut addr, 0, &mut size, 0x3000, 0x04).ok_or(-1)?;
+    let status = syscall!("NtAllocateVirtualMemory", NtCurrentProcess(), &mut addr, 0, &mut size, 0x3000, 0x04).ok_or(-1)?;
     if !NT_SUCCESS(status) {
-        eprintln!("@ NtAllocateVirtualMemory Failed With Status: {}", status);
+        eprintln!("[-] NtAllocateVirtualMemory Failed With Status: {}", status);
         return Err(status);
     }
 
@@ -235,7 +234,7 @@ use dinvk::{
     breakpoint::{set_use_breakpoint, veh_handler},
     data::{HANDLE, NT_SUCCESS},
     AddVectoredExceptionHandler, 
-    NtAllocateVirtualMemory, 
+    NtAllocateVirtualMemory, NtCurrentProcess,
     RemoveVectoredExceptionHandler,
 };
 
@@ -247,9 +246,9 @@ fn main() {
     // Allocating memory and using breakpoint hardware
     let mut addr = std::ptr::null_mut();
     let mut size = 1 << 12;
-    let status = NtAllocateVirtualMemory(-1isize as HANDLE, &mut addr, 0, &mut size, 0x3000, 0x04);
+    let status = NtAllocateVirtualMemory(NtCurrentProcess(), &mut addr, 0, &mut size, 0x3000, 0x04);
     if !NT_SUCCESS(status) {
-        eprintln!("@ NtAllocateVirtualMemory Failed With Status: {}", status);
+        eprintln!("[-] NtAllocateVirtualMemory Failed With Status: {}", status);
         return;
     }
 
@@ -278,24 +277,24 @@ dinvk = { version = "<version>", features = ["alloc", "dinvk_panic"] }
 
 use dinvk::allocator::WinHeap;
 use dinvk::{
-    get_ntdll_address, dprintln, 
+    get_ntdll_address, println, 
     GetProcAddress
 };
 
-#[global_allocator]
-static ALLOCATOR: WinHeap = WinHeap::new();
-
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> u8 {
     let addr = GetProcAddress(get_ntdll_address(), "NtOpenProcess", None);
-    dprintln!("@ NtOpenProcess: {:?}", addr);
+    println!("[+] NtOpenProcess: {:?}", addr);
 
     0
 }
 
+#[global_allocator]
+static ALLOCATOR: WinHeap = WinHeap;
+
 #[cfg(not(test))]
 #[panic_handler]
-fn pan(info: &core::panic::PanicInfo) -> ! {
+fn panic(info: &core::panic::PanicInfo) -> ! {
     dinvk::panic::dinvk_handler(info)
 }
 ```

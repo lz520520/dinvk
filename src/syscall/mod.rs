@@ -5,7 +5,7 @@ use core::{
 };
 use crate::{ 
     hash::jenkins3, 
-    parse::Pe,
+    parse::PE,
 };
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -54,7 +54,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = Pe::new(module)
+        let export_dir = PE::parse(module)
             .exports()
             .directory()?;
         let hash = jenkins3(function_name);
@@ -193,7 +193,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = Pe::new(module)
+        let export_dir = PE::parse(module)
             .exports()
             .directory()?;
         let hash = jenkins3(function_name);
@@ -264,7 +264,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = Pe::new(module)
+        let export_dir = PE::parse(module)
             .exports()
             .directory()?;
         let hash = jenkins3(function_name);

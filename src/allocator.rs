@@ -1,62 +1,20 @@
-use crate::{data::*, link};
+use crate::{data::*, link, GetProcessHeap};
 use core::{
     ptr::null_mut, ffi::c_void,
     alloc::{GlobalAlloc, Layout},
-    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /// A thread-safe wrapper for managing a Windows Heap.
-pub struct WinHeap {
-    // Store the HANDLE as a usize for atomic operations
-    heap: AtomicUsize,
-}
+pub struct WinHeap;
 
 /// Allows `WinHeap` to be safely shared across threads.
 unsafe impl Sync for WinHeap {}
 
 impl WinHeap {
-    /// Creates a new, uninitialized `WinHeap` instance.
-    ///
-    /// The heap is not created until the first memory allocation is attempted.
-    ///
-    /// # Returns
-    ///
-    /// * A new instance of `WinHeap`.
-    pub const fn new() -> Self {
-        WinHeap {
-            heap: AtomicUsize::new(0),
-        }
-    }
-
-    /// Lazily initializes the heap and retrieves its handle.
-    ///
-    /// Uses double-checked locking to ensure only one thread creates the heap,
-    /// while subsequent threads safely access the same heap handle.
-    ///
-    /// # Returns
-    ///
-    /// * A `HANDLE` to the initialized heap.
+    /// Returns the handle to the default process heap.
+    #[inline(always)]
     fn heap(&self) -> HANDLE {
-        let current = self.heap.load(Ordering::Acquire);
-        if current != 0 {
-            return current as HANDLE;
-        }
-
-        // Double-checked locking to ensure only one thread initializes
-        let new_heap = unsafe {
-            RtlCreateHeap(
-                0,
-                null_mut(),
-                0,
-                0,
-                null_mut(),
-                null_mut()
-            )
-        };
-
-        // Try to store the new heap; another thread might beat us to it
-        _ = self.heap.compare_exchange(0, new_heap as usize, Ordering::Release, Ordering::Acquire);
-        self.heap.load(Ordering::Acquire) as HANDLE
+        GetProcessHeap()
     }
 }
 
@@ -109,4 +67,3 @@ unsafe impl GlobalAlloc for WinHeap {
 
 link!("ntdll.dll" "system" fn RtlFreeHeap(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8);
 link!("ntdll.dll" "system" fn RtlAllocateHeap(heap: HANDLE, flags: u32, size: usize) -> *mut c_void);
-link!("ntdll.dll" "system" fn RtlCreateHeap(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE);

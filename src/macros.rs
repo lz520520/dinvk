@@ -108,11 +108,11 @@ macro_rules! link {
 /// # Example
 /// 
 /// ```rust,ignore
-/// dprintln!("Hello, world!");
-/// dprintln!("Value: {}", 42);
+/// println!("Hello, world!");
+/// println!("Value: {}", 42);
 /// ```
 #[macro_export]
-macro_rules! dprintln {
+macro_rules! println {
     ($($arg:tt)*) => {{
         use core::fmt::Write;
         
