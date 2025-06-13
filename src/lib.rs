@@ -37,7 +37,7 @@ pub mod breakpoint;
 pub mod panic;
 
 /// Heap allocator using Windows native APIs (requires `alloc` feature).
-// #[cfg(feature = "alloc")]
+#[cfg(feature = "alloc")]
 pub mod allocator;
 
 // Re-exports for easier usage
