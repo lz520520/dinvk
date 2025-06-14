@@ -66,7 +66,7 @@ Allows resolving and calling a function dynamically at runtime, avoiding static 
 use dinvk::{
     data::HeapAlloc, 
     dinvoke, GetModuleHandle
-    NtCurrentPeb, GetProcessHeap
+    GetProcessHeap
 };
 
 const HEAP_ZERO_MEMORY: u32 = 8u32;
