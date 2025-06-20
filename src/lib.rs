@@ -9,10 +9,8 @@
     clippy::macro_metavars_in_unsafe
 )]
 
-// Allow usage of `alloc` crate for heap-allocated types.
 extern crate alloc;
 
-// Internal modules
 mod functions;
 mod macros;
 mod module;

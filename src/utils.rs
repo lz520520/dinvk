@@ -57,6 +57,7 @@ pub(crate) fn canonicalize_module(name: &str) -> String {
 /// # Arguments
 /// 
 /// * `list` — A mutable slice of elements to be shuffled.
+#[cfg(target_arch = "x86_64")]
 pub fn shuffle<T>(list: &mut [T]) {
     let mut seed = unsafe { core::arch::x86_64::_rdtsc() };
     for i in (1..list.len()).rev() {

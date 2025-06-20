@@ -419,7 +419,7 @@ pub fn __readgsqword(offset: u64) -> u64 {
 /// * The value read from the FS segment.
 #[inline(always)]
 #[cfg(target_arch = "x86")]
-pub unsafe fn __readfsdword(offset: u32) -> u32 {
+pub fn __readfsdword(offset: u32) -> u32 {
     let out: u32;
     unsafe {
         core::arch::asm!(
@@ -444,7 +444,7 @@ pub unsafe fn __readfsdword(offset: u32) -> u32 {
 /// * The value read from x18 plus the given offset.
 #[inline(always)]
 #[cfg(target_arch = "aarch64")]
-pub unsafe fn __readx18(offset: u64) -> u64 {
+pub fn __readx18(offset: u64) -> u64 {
     let out: u64;
     unsafe {
         core::arch::asm!(
