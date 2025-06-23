@@ -313,8 +313,6 @@ Alternatively, consult the [GitHub documentation](https://docs.github.com/en/pul
 
 ## References
 
-I want to express my gratitude to these projects that inspired me to create `dinvk`:
-
 - [DInvoke](https://github.com/TheWover/DInvoke)
 
 ## License
