@@ -31,16 +31,16 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
 
 ## Features
 
-- ✅ Dynamically invoke arbitrary code (*x64*, *x86*, *Wow64*, *ARM64*)
-- ✅ Indirect Syscall (*x64*, *x86*, *Wow64*)
-- ✅ Redirecting Syscall Invocation to Different DLLs
-- ✅ Tampered Syscalls Via Hardware BreakPoints (*x64*, *x86*, *Wow64*)
-- ✅ PE headers parsing
-- ✅ Library Proxy Loading
-- ✅ Support `#[no_std]` projects
-- ✅ Retrieve exported API addresses via string, ordinal, and hashing
-- ✅ Retrieve module addresses via string and hashing
-- ✅ Supports multiple 32-bit hash algorithms for API Hashing using `GetModuleHandle` and `GetProcAddress`: Jenkins3, Jenkins One-at-a-Time, DJB2, Murmur3, FNV-1a, SDBM, Lose, PJW, JS, and AP
+- ✅ Dynamically invoke arbitrary code (*x64*, *x86*, *Wow64*, *ARM64*).
+- ✅ Indirect Syscall (*x64*, *x86*, *Wow64*).
+- ✅ Redirecting Syscall Invocation to Different DLLs.
+- ✅ Tampered Syscalls Via Hardware BreakPoints (*x64*, *x86*, *Wow64*).
+- ✅ PE headers parsing.
+- ✅ Library Proxy Loading.
+- ✅ Supports `#[no_std]` environments (with `alloc`).
+- ✅ Retrieve exported API addresses via string, ordinal, and hashing.
+- ✅ Retrieve module addresses via string and hashing.
+- ✅ Supports multiple 32-bit hash algorithms for API Hashing using `GetModuleHandle` and `GetProcAddress`: Jenkins3, Jenkins One-at-a-Time, DJB2, Murmur3, FNV-1a, SDBM, Lose, PJW, JS, and AP.
 
 ## Installation
 
@@ -61,8 +61,6 @@ Allows resolving and calling a function dynamically at runtime, avoiding static 
 * Using this macro is beneficial if you want to avoid having APIs directly listed in the `Import Address Table (IAT)` of your PE file.
 
 ```rs
-#![allow(unused)]
-
 use dinvk::{
     data::HeapAlloc, 
     dinvoke, GetModuleHandle
