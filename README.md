@@ -25,7 +25,6 @@ This tool is a Rust version of [DInvoke](https://github.com/TheWover/DInvoke), o
     - [Library Proxy Loading](#library-proxy-loading)
     - [Tampered Syscalls Via Hardware BreakPoints](#tampered-syscalls-via-hardware-breakpoints)
     - [Support for #\[no\_std\] Environments](#support-for-no_std-environments)
-- [Contributing to dinvk](#contributing-to-dinvk)
 - [References](#references)
 - [License](#license)
 
