@@ -19,7 +19,7 @@ publish:
 
 # Formats all Rust source files
 fmt:
-    cargo fmt
+    cargo +nightly fmt --check
 
 # Builds local documentation
 docs:
@@ -29,6 +29,10 @@ docs:
 test:
     cargo test --test '*' -- --nocapture
 
-# Run a specific example
-example name:
-    cargo run --example {{name}}
+# Test this workflow on your machine with `act`
+act:
+    act -P windows-latest=-self-hosted
+
+# Format all .toml files using Taplo
+taplo:
+    taplo format
