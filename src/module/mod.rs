@@ -1,4 +1,3 @@
-use obfstr::obfstr as s;
 use alloc::{
     format, vec::Vec, vec,
     string::{String, ToString}, 
@@ -8,6 +7,8 @@ use core::{
     ptr::null_mut, 
     slice::from_raw_parts
 };
+
+use obfstr::obfstr as s;
 use crate::{
     data::*, functions::LoadLibraryA, 
     hash::crc32ba, parse::PE, utils::*
@@ -24,7 +25,7 @@ static NTDLL: spin::Once<u64> = spin::Once::new();
 /// # Arguments
 ///
 /// * `module` - Can be a DLL name (as `&str`) or a hash (`u32`).  
-///             The function will auto-detect and match accordingly.
+///   The function will auto-detect and match accordingly.
 /// * `hash` - Optional hash function (e.g., `crc32`, `murmur3`). Used for hash matching.
 ///
 /// # Returns
@@ -178,7 +179,7 @@ where
                     return null_mut();
                 }
 
-                return core::mem::transmute(h_module + functions[ordinal as usize - (*export_dir).Base as usize] as usize);
+                return (h_module + functions[ordinal as usize - (*export_dir).Base as usize] as usize) as *mut c_void;
             }
         }
 
@@ -324,7 +325,7 @@ pub fn resolve_api_set_map(host_name: &str, contract_name: &str) -> Option<Vec<S
                         val.ValueLength as usize / 2,
                     ));
 
-                    if !name.eq_ignore_ascii_case(&host_name) {
+                    if !name.eq_ignore_ascii_case(host_name) {
                         let dll = String::from_utf16_lossy(from_raw_parts(
                             (map as usize + val.ValueOffset as usize) as *const u16,
                             val.ValueLength as usize / 2,

@@ -1,7 +1,8 @@
 use alloc::{string::{String, ToString}, vec::Vec};
 use core::{fmt::{self, Write}, ptr};
+
 use crate::{
-    data::WriteConsoleA, 
+    data::WriteConsoleAFn, 
     dinvoke, GetModuleHandle, 
     GetStdHandle, 
 };
@@ -31,7 +32,7 @@ impl Write for ConsoleWriter {
         _ = dinvoke!(
             kernel32,
             obfstr::obfstr!("WriteConsoleA"),
-            WriteConsoleA,
+            WriteConsoleAFn,
             GetStdHandle((-11i32) as u32),
             buffer.as_ptr(),
             buffer.len() as u32,

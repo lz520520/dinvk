@@ -1,5 +1,6 @@
-use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
+use obfstr::obfstr as s;
+
 use crate::{
     data::*, dinvoke, get_ntdll_address, 
     GetModuleHandle, NtCurrentTeb,
@@ -19,7 +20,7 @@ pub fn LoadLibraryA(module: &str) -> *mut c_void {
     dinvoke!(
         kernel32,
         s!("LoadLibraryA"),
-        LoadLibraryA,
+        LoadLibraryAFn,
         name.as_ptr().cast()
     )
     .unwrap_or(null_mut())
@@ -65,7 +66,7 @@ pub fn NtAllocateVirtualMemory(
     dinvoke!(
         get_ntdll_address(),
         s!("NtAllocateVirtualMemory"),
-        NtAllocateVirtualMemory,
+        NtAllocateVirtualMemoryFn,
         process_handle,
         base_address,
         zero_bits,
@@ -114,7 +115,7 @@ pub fn NtProtectVirtualMemory(
     dinvoke!(
         get_ntdll_address(),
         s!("NtProtectVirtualMemory"),
-        NtProtectVirtualMemory,
+        NtProtectVirtualMemoryFn,
         process_handle,
         base_address,
         region_size,
@@ -174,7 +175,7 @@ pub fn NtCreateThreadEx(
     dinvoke!(
         get_ntdll_address(),
         s!("NtCreateThreadEx"),
-        NtCreateThreadEx,
+        NtCreateThreadExFn,
         thread_handle,
         desired_access,
         object_attributes,
@@ -231,7 +232,7 @@ pub fn NtWriteVirtualMemory(
     dinvoke!(
         get_ntdll_address(),
         s!("NtWriteVirtualMemory"),
-        NtWriteVirtualMemory,
+        NtWriteVirtualMemoryFn,
         process_handle,
         base_address,
         buffer,
@@ -251,7 +252,7 @@ pub fn HeapAlloc(
     dinvoke!(
         kernel32,
         s!("HeapAlloc"),
-        HeapAlloc,
+        HeapAllocFn,
         hheap,
         dwflags,
         dwbytes
@@ -269,7 +270,7 @@ pub fn HeapFree(
     dinvoke!(
         kernel32,
         s!("HeapFree"),
-        HeapFree,
+        HeapFreeFn,
         hheap,
         dwflags,
         lpmem
@@ -287,7 +288,7 @@ pub fn HeapCreate(
     dinvoke!(
         kernel32,
         s!("HeapCreate"),
-        HeapCreate,
+        HeapCreateFn,
         floptions,
         dwinitialsize,
         dwmaximumsize
@@ -304,7 +305,7 @@ pub fn AddVectoredExceptionHandler(
     dinvoke!(
         kernel32,
         s!("AddVectoredExceptionHandler"),
-        AddVectoredExceptionHandler,
+        AddVectoredExceptionHandlerFn,
         first,
         handler
     )
@@ -319,7 +320,7 @@ pub fn RemoveVectoredExceptionHandler(
     dinvoke!(
         kernel32,
         s!("RemoveVectoredExceptionHandler"),
-        RemoveVectoredExceptionHandler,
+        RemoveVectoredExceptionHandlerFn,
         handle
     )
     .unwrap_or(0)
@@ -333,7 +334,7 @@ pub fn NtGetThreadContext(
     dinvoke!(
         get_ntdll_address(),
         s!("NtGetThreadContext"),
-        NtGetThreadContext,
+        NtGetThreadContextFn,
         hthread,
         lpcontext
     )
@@ -348,7 +349,7 @@ pub fn NtSetThreadContext(
     dinvoke!(
         get_ntdll_address(),
         s!("NtSetThreadContext"),
-        NtSetThreadContext,
+        NtSetThreadContextFn,
         hthread,
         lpcontext
     )
@@ -361,7 +362,7 @@ pub fn GetStdHandle(nStdHandle: u32) -> HANDLE {
     dinvoke!(
         kernel32,
         s!("GetStdHandle"),
-        GetStdHandle,
+        GetStdHandleFn,
         nStdHandle
     )
     .unwrap_or(null_mut())
@@ -398,4 +399,11 @@ pub fn GetCurrentProcessId() -> u32 {
 pub fn GetCurrentThreadId() -> u32 {
     let teb = NtCurrentTeb();
     (unsafe { *teb }).Reserved1[9] as u32
+}
+
+/// Evaluates to TRUE if the return value specified by `nt_status` is a success
+/// type (0 − 0x3FFFFFFF) or an informational type (0x40000000 − 0x7FFFFFFF).
+/// This function is taken from ntdef.h in the WDK.
+pub const fn NT_SUCCESS(nt_status: NTSTATUS) -> bool {
+    nt_status >= 0
 }

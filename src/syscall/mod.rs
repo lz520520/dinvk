@@ -54,9 +54,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = PE::parse(module)
-            .exports()
-            .directory()?;
+        let export_dir = PE::parse(module).exports().directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
         
@@ -193,9 +191,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = PE::parse(module)
-            .exports()
-            .directory()?;
+        let export_dir = PE::parse(module).exports().directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
         
@@ -264,9 +260,7 @@ pub fn ssn(
 ) -> Option<u16> {
     unsafe {
         // Recovering the export directory and hashing the module 
-        let export_dir = PE::parse(module)
-            .exports()
-            .directory()?;
+        let export_dir = PE::parse(module).exports().directory()?;
         let hash = jenkins3(function_name);
         let module = module as usize;
 
@@ -471,8 +465,7 @@ pub fn get_syscall_address(address: *mut c_void) -> Option<u32> {
 ///
 /// # Returns
 ///
-/// * `true` - If the process is running under **WOW64**.
-/// * `false` - If the process is running in **pure x86 mode**.
+/// * If the process is running under **WOW64**.
 /// 
 /// # Reference
 /// 

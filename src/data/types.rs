@@ -23,25 +23,25 @@ pub type HMODULE = *mut c_void;
 pub type PVECTORED_EXCEPTION_HANDLER = Option<unsafe extern "system" fn(exceptioninfo: *mut EXCEPTION_POINTERS) -> i32>;
 pub type PPS_POST_PROCESS_INIT_ROUTINE = unsafe extern "system" fn();
 
-pub type LoadLibraryA = unsafe extern "system" fn(fnlpLibFileName: *const u8) -> *mut c_void;
-pub type RemoveVectoredExceptionHandler = unsafe extern "system" fn(handle: *mut c_void) -> u32;
-pub type NtGetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *mut CONTEXT) -> i32;
-pub type NtSetThreadContext = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *const CONTEXT) -> i32;
-pub type RtlCaptureContext = unsafe extern "system" fn(contextrecord: *mut CONTEXT);
-pub type RtlCreateTimerQueue = unsafe extern "system" fn(TimerQueueHandle: *mut HANDLE) -> NTSTATUS;
-pub type HeapAlloc = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLAGS, dwbytes: usize) -> *mut c_void;
-pub type HeapFree = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLAGS, lpmem: *const c_void) -> *mut c_void;
-pub type HeapCreate = unsafe extern "system" fn(floptions: HEAP_FLAGS, dwinitialsize: usize, dwmaximumsize: usize) -> *mut c_void;
-pub type AddVectoredExceptionHandler = unsafe extern "system" fn(first: u32, handler: PVECTORED_EXCEPTION_HANDLER) -> *mut c_void;
-pub type OutputDebugStringA = unsafe extern "system" fn(lpOutputString: *const u8);
-pub type WriteConsoleA = unsafe extern "system" fn(hConsoleOutput: HANDLE, lpBuffer: *const u8, nNumberOfCharsToWrite: u32, lpNumberOfCharsWritten: *mut u32, lpReserved: *mut c_void);
-pub type GetStdHandle = unsafe extern "system" fn(nStdHandle: u32) -> HANDLE;
-pub type RtlCreateHeap = unsafe extern "system" fn(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE;
-pub type RtlAllocateHeap = unsafe extern "system" fn(heap: HANDLE, flags: u32, size: usize) -> *mut c_void;
-pub type RtlFreeHeap = unsafe extern "system" fn(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8;
-pub type RtlDestroyHeap = unsafe extern "system" fn(heap: *mut c_void) -> i8;
+pub type LoadLibraryAFn = unsafe extern "system" fn(fnlpLibFileName: *const u8) -> *mut c_void;
+pub type RemoveVectoredExceptionHandlerFn = unsafe extern "system" fn(handle: *mut c_void) -> u32;
+pub type NtGetThreadContextFn = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *mut CONTEXT) -> i32;
+pub type NtSetThreadContextFn = unsafe extern "system" fn(hthread: HANDLE, lpcontext: *const CONTEXT) -> i32;
+pub type RtlCaptureContextFn = unsafe extern "system" fn(contextrecord: *mut CONTEXT);
+pub type RtlCreateTimerQueueFn = unsafe extern "system" fn(TimerQueueHandle: *mut HANDLE) -> NTSTATUS;
+pub type HeapAllocFn = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLAGS, dwbytes: usize) -> *mut c_void;
+pub type HeapFreeFn = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLAGS, lpmem: *const c_void) -> *mut c_void;
+pub type HeapCreateFn = unsafe extern "system" fn(floptions: HEAP_FLAGS, dwinitialsize: usize, dwmaximumsize: usize) -> *mut c_void;
+pub type AddVectoredExceptionHandlerFn = unsafe extern "system" fn(first: u32, handler: PVECTORED_EXCEPTION_HANDLER) -> *mut c_void;
+pub type OutputDebugStringAFn = unsafe extern "system" fn(lpOutputString: *const u8);
+pub type WriteConsoleAFn = unsafe extern "system" fn(hConsoleOutput: HANDLE, lpBuffer: *const u8, nNumberOfCharsToWrite: u32, lpNumberOfCharsWritten: *mut u32, lpReserved: *mut c_void);
+pub type GetStdHandleFn = unsafe extern "system" fn(nStdHandle: u32) -> HANDLE;
+pub type RtlCreateHeapFn = unsafe extern "system" fn(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE;
+pub type RtlAllocateHeapFn = unsafe extern "system" fn(heap: HANDLE, flags: u32, size: usize) -> *mut c_void;
+pub type RtlFreeHeapFn = unsafe extern "system" fn(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8;
+pub type RtlDestroyHeapFn = unsafe extern "system" fn(heap: *mut c_void) -> i8;
 
-pub type NtCreateEvent = unsafe extern "system" fn(
+pub type NtCreateEventFn = unsafe extern "system" fn(
     EventHandle: *mut HANDLE,
     DesiredAccess: u32, 
     ObjectAttribute: *mut OBJECT_ATTRIBUTES, 
@@ -49,7 +49,7 @@ pub type NtCreateEvent = unsafe extern "system" fn(
     InitialState: u8
 ) -> NTSTATUS;
 
-pub type RtlRegisterWait = unsafe extern "system" fn(
+pub type RtlRegisterWaitFn = unsafe extern "system" fn(
     WaitHandle: *mut HANDLE,
     Handle: HANDLE,
     Function: *mut c_void,
@@ -58,7 +58,7 @@ pub type RtlRegisterWait = unsafe extern "system" fn(
     Flags: u32
 ) -> NTSTATUS;
 
-pub type NtAllocateVirtualMemory = unsafe extern "system" fn(
+pub type NtAllocateVirtualMemoryFn = unsafe extern "system" fn(
     ProcessHandle: HANDLE,
     BaseAddress: *mut *mut c_void,
     ZeroBits: usize,
@@ -67,7 +67,7 @@ pub type NtAllocateVirtualMemory = unsafe extern "system" fn(
     Protect: u32,
 ) -> NTSTATUS;
 
-pub type NtProtectVirtualMemory = unsafe extern "system" fn(
+pub type NtProtectVirtualMemoryFn = unsafe extern "system" fn(
     ProcessHandle: HANDLE,
     BaseAddress: *mut *mut c_void,
     RegionSize: *mut usize,
@@ -75,7 +75,7 @@ pub type NtProtectVirtualMemory = unsafe extern "system" fn(
     OldProtect: *mut u32,
 ) -> NTSTATUS;
 
-pub type NtWriteVirtualMemory = unsafe extern "system" fn(
+pub type NtWriteVirtualMemoryFn = unsafe extern "system" fn(
     ProcessHandle: HANDLE,
     BaseAddress: *mut c_void,
     Buffer: *mut c_void,
@@ -83,7 +83,7 @@ pub type NtWriteVirtualMemory = unsafe extern "system" fn(
     NumberOfBytesWritten: *mut usize,
 ) -> NTSTATUS;
 
-pub type NtCreateThreadEx = unsafe extern "system" fn(
+pub type NtCreateThreadExFn = unsafe extern "system" fn(
     ThreadHandle: *mut HANDLE,
     DesiredAccess: u32,
     ObjectAttributes: *mut OBJECT_ATTRIBUTES,
@@ -97,13 +97,13 @@ pub type NtCreateThreadEx = unsafe extern "system" fn(
     AttributeList: *mut PS_ATTRIBUTE_LIST
 ) -> NTSTATUS;
 
-pub type RtlQueueWorkItem = unsafe extern "system" fn(
+pub type RtlQueueWorkItemFn = unsafe extern "system" fn(
     Function: WORKERCALLBACKFUNC,
     Context: *mut c_void,
     Flags: u32
 ) -> NTSTATUS;
 
-pub type RtlCreateTimer = unsafe extern "system" fn(
+pub type RtlCreateTimerFn = unsafe extern "system" fn(
     TimerQueueHandle: HANDLE,
     Handle: *mut HANDLE,
     Function: WAITORTIMERCALLBACKFUNC,

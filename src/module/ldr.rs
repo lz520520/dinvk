@@ -1,9 +1,13 @@
 use alloc::vec::Vec;
-use obfstr::obfstr as s;
 use core::{ffi::c_void, ptr::null_mut};
+use obfstr::obfstr as s;
+
+use crate::{data::*, NT_SUCCESS};
 use crate::{
-    data::*, dinvoke, get_ntdll_address, 
-    GetModuleHandle, GetProcAddress 
+    dinvoke,
+    get_ntdll_address,
+    GetModuleHandle, 
+    GetProcAddress 
 };
 
 /// A helper struct to interact with dynamic module loading with Windows APIs via Proxy.
@@ -52,7 +56,7 @@ impl<'a> LdrProxy<'a> {
         Some(dinvoke!(
             ntdll,
             s!("RtlQueueWorkItem"),
-            RtlQueueWorkItem,
+            RtlQueueWorkItemFn,
             core::mem::transmute(load_library),
             module.as_ptr() as *mut c_void,
             0x00000000
@@ -75,7 +79,7 @@ impl<'a> LdrProxy<'a> {
         
         // Create a timer queue
         let mut queue = null_mut();
-        let status = dinvoke!(ntdll, s!("RtlCreateTimerQueue"), RtlCreateTimerQueue, &mut queue)?;
+        let status = dinvoke!(ntdll, s!("RtlCreateTimerQueue"), RtlCreateTimerQueueFn, &mut queue)?;
         if !NT_SUCCESS(status) {
             return None;
         }
@@ -92,7 +96,7 @@ impl<'a> LdrProxy<'a> {
         Some(dinvoke!(
             ntdll,
             s!("RtlCreateTimer"),
-            RtlCreateTimer,
+            RtlCreateTimerFn,
             queue,
             &mut h_timer,
             core::mem::transmute(load_library),
@@ -117,7 +121,7 @@ impl<'a> LdrProxy<'a> {
     
         // Create an event handle
         let mut h_event = null_mut();
-        let status = dinvoke!(ntdll, s!("NtCreateEvent"), NtCreateEvent, &mut h_event, EVENT_ALL_ACCESS, null_mut(), EVENT_TYPE::SynchronizationEvent, 0)?;
+        let status = dinvoke!(ntdll, s!("NtCreateEvent"), NtCreateEventFn, &mut h_event, EVENT_ALL_ACCESS, null_mut(), EVENT_TYPE::SynchronizationEvent, 0)?;
         if !NT_SUCCESS(status) {
             return None;
         }
@@ -134,7 +138,7 @@ impl<'a> LdrProxy<'a> {
         Some(dinvoke!(
             ntdll,
             s!("RtlRegisterWait"),
-            RtlRegisterWait,
+            RtlRegisterWaitFn,
             &mut h_timer,
             h_event,
             load_library,

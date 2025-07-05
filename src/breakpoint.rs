@@ -1,6 +1,7 @@
 use core::ffi::c_void;
 use core::ptr::addr_of_mut;
 use core::sync::atomic::{Ordering, AtomicBool};
+
 use crate::{NtGetThreadContext, NtSetThreadContext};
 use crate::data::{
     CONTEXT, CONTEXT_DEBUG_REGISTERS_AMD64, EXCEPTION_SINGLE_STEP,
@@ -152,7 +153,7 @@ pub enum WINAPI {
 /// # Arguments
 /// 
 /// * `exceptioninfo` - A pointer to the [`EXCEPTION_POINTERS`] structure containing information
-///     about the current exception, including the CPU context and exception code.
+///   about the current exception, including the CPU context and exception code.
 ///
 /// # Returns
 /// 

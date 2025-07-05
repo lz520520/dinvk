@@ -1,14 +1,12 @@
-use crate::{data::*, link, GetProcessHeap};
 use core::{
     ptr::null_mut, ffi::c_void,
     alloc::{GlobalAlloc, Layout},
 };
 
+use crate::{data::*, link, GetProcessHeap};
+
 /// A thread-safe wrapper for managing a Windows Heap.
 pub struct WinHeap;
-
-/// Allows `WinHeap` to be safely shared across threads.
-unsafe impl Sync for WinHeap {}
 
 impl WinHeap {
     /// Returns the handle to the default process heap.
