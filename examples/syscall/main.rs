@@ -1,7 +1,7 @@
 use std::{ffi::c_void, ptr::null_mut};
 use dinvk::{
-    data::{HANDLE, NTSTATUS, NT_SUCCESS}, 
-    syscall, Dll
+    data::{HANDLE, NTSTATUS},
+    NT_SUCCESS, syscall, Dll
 };
 
 fn main() -> Result<(), NTSTATUS> {

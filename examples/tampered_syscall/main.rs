@@ -1,6 +1,12 @@
 use dinvk::{
-    breakpoint::{set_use_breakpoint, veh_handler},
-    data::{HANDLE, NT_SUCCESS},
+    data::HANDLE,
+    breakpoint::{
+        set_use_breakpoint, 
+        veh_handler
+    },
+};
+use dinvk::{
+    NT_SUCCESS,
     AddVectoredExceptionHandler, 
     NtAllocateVirtualMemory, 
     RemoveVectoredExceptionHandler,
