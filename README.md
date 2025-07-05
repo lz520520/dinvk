@@ -61,8 +61,8 @@ Allows resolving and calling a function dynamically at runtime, avoiding static 
 
 ```rs
 use dinvk::{
-    data::HeapAlloc, 
-    dinvoke, GetModuleHandle
+    data::HeapAllocFn, 
+    dinvoke, GetModuleHandle,
     GetProcessHeap
 };
 
@@ -73,7 +73,7 @@ fn main() {
     let addr = dinvoke!(
         kernel32,
         "HeapAlloc",
-        HeapAlloc,
+        HeapAllocFn,
         GetProcessHeap(),
         HEAP_ZERO_MEMORY,
         0x200
@@ -228,10 +228,16 @@ Utilizes hardware breakpoints to manipulate syscall parameters before execution,
 
 ```rs
 use dinvk::{
-    breakpoint::{set_use_breakpoint, veh_handler},
-    data::{HANDLE, NT_SUCCESS},
+    data::HANDLE,
+    breakpoint::{
+        set_use_breakpoint, 
+        veh_handler
+    },
+};
+use dinvk::{
+    NT_SUCCESS,
     AddVectoredExceptionHandler, 
-    NtAllocateVirtualMemory, NtCurrentProcess,
+    NtAllocateVirtualMemory, 
     RemoveVectoredExceptionHandler,
 };
 
@@ -243,9 +249,9 @@ fn main() {
     // Allocating memory and using breakpoint hardware
     let mut addr = std::ptr::null_mut();
     let mut size = 1 << 12;
-    let status = NtAllocateVirtualMemory(NtCurrentProcess(), &mut addr, 0, &mut size, 0x3000, 0x04);
+    let status = NtAllocateVirtualMemory(-1isize as HANDLE, &mut addr, 0, &mut size, 0x3000, 0x04);
     if !NT_SUCCESS(status) {
-        eprintln!("[-] NtAllocateVirtualMemory Failed With Status: {}", status);
+        eprintln!("@ NtAllocateVirtualMemory Failed With Status: {}", status);
         return;
     }
 
