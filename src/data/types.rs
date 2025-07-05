@@ -34,12 +34,26 @@ pub type HeapFreeFn = unsafe extern "system" fn(hheap: HANDLE, dwflags: HEAP_FLA
 pub type HeapCreateFn = unsafe extern "system" fn(floptions: HEAP_FLAGS, dwinitialsize: usize, dwmaximumsize: usize) -> *mut c_void;
 pub type AddVectoredExceptionHandlerFn = unsafe extern "system" fn(first: u32, handler: PVECTORED_EXCEPTION_HANDLER) -> *mut c_void;
 pub type OutputDebugStringAFn = unsafe extern "system" fn(lpOutputString: *const u8);
-pub type WriteConsoleAFn = unsafe extern "system" fn(hConsoleOutput: HANDLE, lpBuffer: *const u8, nNumberOfCharsToWrite: u32, lpNumberOfCharsWritten: *mut u32, lpReserved: *mut c_void);
 pub type GetStdHandleFn = unsafe extern "system" fn(nStdHandle: u32) -> HANDLE;
-pub type RtlCreateHeapFn = unsafe extern "system" fn(flags: u32, base: *mut c_void, reserve: usize, commit: usize, lock: *mut c_void, param: *mut c_void) -> HANDLE;
 pub type RtlAllocateHeapFn = unsafe extern "system" fn(heap: HANDLE, flags: u32, size: usize) -> *mut c_void;
 pub type RtlFreeHeapFn = unsafe extern "system" fn(heap: HANDLE, flags: u32, ptr: *mut c_void) -> i8;
 pub type RtlDestroyHeapFn = unsafe extern "system" fn(heap: *mut c_void) -> i8;
+pub type RtlCreateHeapFn = unsafe extern "system" fn(
+    flags: u32, 
+    base: *mut c_void, 
+    reserve: usize, 
+    commit: usize, 
+    lock: *mut c_void, 
+    param: *mut c_void
+) -> HANDLE;
+
+pub type WriteConsoleAFn = unsafe extern "system" fn(
+    hConsoleOutput: HANDLE, 
+    lpBuffer: *const u8, 
+    nNumberOfCharsToWrite: u32, 
+    lpNumberOfCharsWritten: *mut u32, 
+    lpReserved: *mut c_void
+);
 
 pub type NtCreateEventFn = unsafe extern "system" fn(
     EventHandle: *mut HANDLE,
