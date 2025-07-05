@@ -40,24 +40,24 @@ targets = [
 
 [[example]]
 name = "dinvoke"
-path = "examples/1. dinvoke/main.rs"
+path = "examples/dinvoke/main.rs"
 
 [[example]]
 name = "get_module_and_api"
-path = "examples/2. get_module_and_api/main.rs"
+path = "examples/get_module_and_api/main.rs"
 
 [[example]]
 name = "hash"
-path = "examples/3. hash/main.rs"
+path = "examples/hash/main.rs"
 
 [[example]]
 name = "library_proxy"
-path = "examples/4. library_proxy/main.rs"
+path = "examples/library_proxy/main.rs"
 
 [[example]]
 name = "syscall"
-path = "examples/5. syscall/main.rs"
+path = "examples/syscall/main.rs"
 
 [[example]]
 name = "tampered_syscall"
-path = "examples/6. tampered_syscall/main.rs"
+path = "examples/tampered_syscall/main.rs"
