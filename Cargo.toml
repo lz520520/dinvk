@@ -43,8 +43,8 @@ name = "dinvoke"
 path = "examples/dinvoke/main.rs"
 
 [[example]]
-name = "get_module_and_api"
-path = "examples/get_module_and_api/main.rs"
+name = "get_module_and_function"
+path = "examples/get_module_and_function/main.rs"
 
 [[example]]
 name = "hash"

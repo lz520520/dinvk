@@ -37,7 +37,7 @@ jobs:
 
     strategy:
       matrix:
-        example: [dinvoke, get_module_and_api, hash, syscall, tampered_syscall]
+        example: [dinvoke, get_module_and_function, hash, syscall, tampered_syscall]
 
     steps:
       - uses: actions/checkout@v4
