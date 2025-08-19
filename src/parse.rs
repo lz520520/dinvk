@@ -3,7 +3,7 @@ use core::{
     ffi::{c_void, CStr},
     slice::from_raw_parts,
 };
-
+use core::mem::size_of;
 use crate::data::*;
 
 /// Maps exported function addresses to their respective names.

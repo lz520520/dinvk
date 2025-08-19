@@ -93,7 +93,7 @@ is_wow64:
 #[doc(hidden)]
 #[allow(unused_doc_comments)]
 #[cfg(target_arch = "x86_64")]
-unsafe extern "C" {
+extern "C" {
     pub fn do_syscall(
         ssn: u16,
         syscall_addr: u64,
@@ -105,7 +105,7 @@ unsafe extern "C" {
 #[doc(hidden)]
 #[allow(unused_doc_comments)]
 #[cfg(target_arch = "x86")]
-unsafe extern "C" {
+extern "C" {
     pub fn do_syscall(
         ssn: u16,
         syscall_addr: u32,
